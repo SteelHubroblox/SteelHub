@@ -397,20 +397,34 @@ function updateAI(p, dt) {
     }
   }
 
-  // Aim and fire towards enemy center with jitter
-  const ax = (enemy.x + enemy.w / 2) - (p.x + p.w / 2);
-  const ay = (enemy.y + enemy.h * 0.4) - (p.y + p.h * 0.35);
-  const len = Math.hypot(ax, ay) || 1;
-  const dirX = ax / len; const dirY = ay / len;
-  p.facing = Math.sign(dirX) || 1;
+  // Predictive aim and fire towards enemy with jitter and bullet drop compensation
+  const gunX = p.x + p.w / 2 + p.facing * 12;
+  const gunY = p.y + p.h * 0.35;
+  const ex = enemy.x + enemy.w / 2;
+  const ey = enemy.y + enemy.h * 0.4;
+  const relX = ex - gunX;
+  const relY = ey - gunY;
+  const dist = Math.hypot(relX, relY) || 1;
+  let t = clamp(dist / p.bulletSpeed, 0.05, 0.8);
+  // one-iter lead using enemy velocity
+  const gEff = G * 0.2; // bullet gravity factor
+  const leadX = ex + enemy.vx * t;
+  const leadY = ey + enemy.vy * t - 0.5 * gEff * t * t; // aim slightly above to compensate drop
+  let aimX = leadX - gunX;
+  let aimY = leadY - gunY;
+  const n = Math.hypot(aimX, aimY) || 1;
+  aimX /= n; aimY /= n;
+  // jitter for human-like aim
+  aimX += randRange(-AI.aimJitter, AI.aimJitter);
+  aimY += randRange(-AI.aimJitter, AI.aimJitter);
+  const n2 = Math.hypot(aimX, aimY) || 1; aimX/=n2; aimY/=n2;
+  p.facing = Math.sign(aimX) || 1;
+
   p.reload -= dt;
-  if (Math.abs(dx) < canvas.width * 0.6 && p.reload <= 0) {
-    const jitterX = dirX + randRange(-AI.aimJitter, AI.aimJitter);
-    const jitterY = dirY + randRange(-AI.aimJitter, AI.aimJitter);
-    const nlen = Math.hypot(jitterX, jitterY) || 1;
-    const vx = (jitterX / nlen) * p.bulletSpeed;
-    const vy = (jitterY / nlen) * p.bulletSpeed;
-    bullets.push(new Bullet(p, p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35, vx, vy, p.bulletDmg, p.color));
+  if (p.reload <= 0 && Math.abs(dx) < canvas.width * 0.7) {
+    const vx = aimX * p.bulletSpeed;
+    const vy = aimY * p.bulletSpeed;
+    bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
     p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
     addShake(0.05);
   }
