@@ -3,29 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>3D City Walk - Canvas Game</title>
+    <title>Rounds-like 2D</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="ui">
-      <div id="title">3D City Walk</div>
+      <div id="title">Rounds-like 2D</div>
       <div id="instructions">
-        Click to enter. Use WASD to move, mouse to look, Space to jump, Shift to sprint. Esc to unlock cursor.
+        Player 1: A/D to move, W to jump, F to shoot. Player 2: Left/Right to move, Up to jump, / to shoot.
       </div>
-      <div id="hint">Press H to toggle HUD, M to toggle minimap, G to toggle GUI</div>
+      <div id="hint">First to 3 rounds wins. Between rounds, pick a card to upgrade.</div>
     </div>
+
+    <canvas id="game"></canvas>
 
     <div id="overlay" class="overlay">
-      <button id="startButton" class="primary">Enter City</button>
+      <button id="startButton" class="primary">Enter Arena</button>
     </div>
+
+    <div id="draftOverlay" class="overlay hidden">
+      <div class="draft">
+        <div class="draft-title">Pick an upgrade</div>
+        <div id="draftPlayerLabel" class="draft-sub"></div>
+        <div id="cardGrid" class="card-grid"></div>
+        <div class="draft-hint">Click a card to select</div>
+      </div>
+    </div>
+
     <div id="debug" style="position:fixed; bottom:10px; left:10px; z-index:15; font:12px monospace; opacity:0.85;"></div>
 
-    <script>
-      // Fail-safe: hide overlay if module fails to load
-      window.addEventListener('error', () => {
-        const ov = document.getElementById('overlay'); if (ov) ov.classList.add('hidden');
-      }, { once: true });
-    </script>
     <script type="module" src="main.js"></script>
   </body>
 </html>

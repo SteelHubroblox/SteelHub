@@ -97,4 +97,47 @@ canvas {
   z-index: 9;
 }
 
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+/* Draft UI */
+.draft {
+  width: min(900px, 92vw);
+  padding: 18px;
+  background: rgba(20, 22, 28, 0.9);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  color: #fff;
+}
+.draft-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.draft-sub {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 12px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.card {
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.35); }
+.card-title { font-weight: 700; margin-bottom: 6px; }
+.card-desc { font-size: 12px; opacity: 0.85; }
 .hidden { display: none; }
