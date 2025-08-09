@@ -56,7 +56,9 @@ async function loadDeps() {
 
 try {
   await loadDeps();
+  window.__depsOK = true;
 } catch (e) {
+  window.__depsOK = false;
   console.error('Failed loading dependencies', e);
 }
 
@@ -203,6 +205,16 @@ function init() {
     const grid = new THREE.GridHelper(1000, 100, 0x222222, 0x333333);
     grid.position.y = 0.01;
     scene.add(grid);
+
+    // Add a minimal fallback building near origin so city presence is obvious
+    const fallbackBox = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 40, 20),
+      new THREE.MeshStandardMaterial({ color: 0x556b8e, roughness: 0.7, metalness: 0.2 })
+    );
+    fallbackBox.position.set(30, 20, -40);
+    fallbackBox.castShadow = true;
+    fallbackBox.receiveShadow = true;
+    scene.add(fallbackBox);
 
     window.addEventListener('resize', onWindowResize);
 
@@ -828,6 +840,17 @@ function animate() {
   }
 
   stats.update();
+
+  // debug info
+  try {
+    const dbg = document.getElementById('debug');
+    if (dbg) {
+      const total = scene ? scene.children.length : 0;
+      const meshes = [];
+      scene && scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+      dbg.textContent = `depsOk=${window.__depsOK} meshes=${meshes.length} children=${total}`;
+    }
+  } catch {}
 }
 
 function updateNightLighting() {
