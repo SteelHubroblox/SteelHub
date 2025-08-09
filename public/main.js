@@ -153,6 +153,7 @@ class Player {
     const heavyMagL = clampLevel(L('heavymag'));
     const fastRelL = clampLevel(L('fastreload'));
     const glassL = clampLevel(L('glasscannon'));
+    this.unstoppableLevel = clampLevel(L('unstoppable'));
 
     // Magazine/reload
     this.magSize = 8 + 4*bigMagL + 6*heavyMagL;
@@ -176,7 +177,7 @@ class Player {
 class Bullet {
   constructor(owner, x, y, vx, vy, dmg, color) {
     this.owner = owner; this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.r = 4;
-    this.dmg = dmg; this.life = 2.5; this.color = color; this.pierces = owner.pierceLevel; this.bounces = owner.bounceLevel;
+    this.dmg = dmg; this.life = 2.5; this.color = color; this.pierces = 0; this.bounces = owner.bounceLevel;
   }
 }
 
@@ -206,7 +207,7 @@ const ALL_CARDS = [
   { id: 'speed', title: 'Sprinter', desc: 'Increase move speed', rarity: RARITY.Common },
   { id: 'jumper', title: 'Bunny Hop', desc: 'Increase jump power', rarity: RARITY.Common },
   { id: 'doublejump', title: 'Double Jump', desc: 'Gain extra jumps', rarity: RARITY.Rare },
-  { id: 'pierce', title: 'Piercing Rounds', desc: 'Bullets pierce', rarity: RARITY.Rare },
+  { id: 'unstoppable', title: 'Unstoppable Bullets', desc: 'Bullets pass through platforms', rarity: RARITY.Legendary },
   { id: 'bounce', title: 'Bouncy Bullets', desc: 'Bullets bounce', rarity: RARITY.Epic },
   { id: 'sniper', title: 'Marksman', desc: 'Increase bullet speed', rarity: RARITY.Rare },
   { id: 'explosive', title: 'Explosive Rounds', desc: 'Bullets explode', rarity: RARITY.Legendary },
@@ -516,8 +517,9 @@ const aimStick = document.getElementById('aimStick');
 const aimKnob = document.getElementById('aimKnob');
 let isMobile = false;
 function checkMobile() {
-  isMobile = window.innerWidth <= 900 || ('ontouchstart' in window);
-  if (!isMobile) mobileControls.classList.add('hidden'); else mobileControls.classList.remove('hidden');
+  const touchCapable = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+  isMobile = touchCapable;
+  mobileControls.classList.toggle('show', isMobile);
 }
 window.addEventListener('resize', checkMobile); checkMobile();
 
@@ -683,8 +685,10 @@ function update(dt) {
     b.vy += (G * 0.2) * dt;
     const bb = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
     let hitGeom = false;
-    for (const s of platforms) if (rectsIntersect(bb, s)) { hitGeom = true; if (b.bounces > 0) { b.vy = -Math.abs(b.vy) * 0.7; b.bounces--; hitGeom = false; } else if (b.owner.explosiveLevel > 0) { spawnExplosion(b.x, b.y, b.owner); } break; }
-    for (const hz of hazards) if (rectsIntersect(bb, hz)) { hitGeom = true; break; }
+    if (!(b.owner.unstoppableLevel > 0)) {
+      for (const s of platforms) if (rectsIntersect(bb, s)) { hitGeom = true; if (b.bounces > 0) { b.vy = -Math.abs(b.vy) * 0.7; b.bounces--; hitGeom = false; } else if (b.owner.explosiveLevel > 0) { spawnExplosion(b.x, b.y, b.owner); } break; }
+      for (const hz of hazards) if (rectsIntersect(bb, hz)) { hitGeom = true; break; }
+    }
     if (hitGeom) { bullets.splice(i, 1); continue; }
     if (b.x < -50 || b.x > canvas.width + 50 || b.y > canvas.height + 200) { bullets.splice(i, 1); continue; }
     for (const p of players) {

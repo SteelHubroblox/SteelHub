@@ -171,6 +171,7 @@ canvas {
   pointer-events: none;
   z-index: 14;
 }
+#mobileControls { display: none; }
 .mc-left, .mc-right { display: flex; gap: 10px; align-items: center; pointer-events: auto; }
 .mc-left { margin-bottom: 8px; }
 .mc-right { margin-bottom: 8px; }
@@ -186,5 +187,5 @@ canvas {
 
 @media (max-width: 900px) {
   #mobileControls.hidden { display: none; }
-  #mobileControls:not(.hidden) { display: flex; }
+  #mobileControls.show { display: flex; }
 }
