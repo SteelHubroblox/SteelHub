@@ -1234,6 +1234,30 @@ function renderAll() {
   renderMiniGamesPanel();
 }
 
+let deferredInstallPrompt = null;
+function setupPwaInstall() {
+  const btn = document.getElementById('btn-install');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (btn) btn.classList.remove('hidden');
+  });
+  if (btn) btn.onclick = async () => {
+    if (!deferredInstallPrompt) return;
+    btn.disabled = true; btn.textContent = 'Instalando…';
+    try {
+      const choice = await deferredInstallPrompt.prompt();
+      deferredInstallPrompt = null;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Instalar'; btn.classList.add('hidden');
+    }
+  };
+  window.addEventListener('appinstalled', () => {
+    tryConfetti();
+    setTimeout(()=>alert('¡Speakify instalado en tu dispositivo!'), 100);
+  });
+}
+
 async function boot() {
   document.getElementById('year').textContent = String(new Date().getFullYear());
   AudioTTS.initVoices();
@@ -1242,6 +1266,7 @@ async function boot() {
   Leaderboard.upsert(Profile.load());
   renderAll();
   attachGlobalHandlers();
+  setupPwaInstall();
 }
 
 window.addEventListener('load', boot);
