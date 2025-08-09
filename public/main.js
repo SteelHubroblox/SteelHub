@@ -102,6 +102,14 @@ class Player {
     this.lifesteal = 0;
     this.shieldCooldownMax = 0; this.shieldCooldown = 0; this.shieldCharges = 0; this.shieldCapacity = 0;
     this.aiJumpCd = 0; this.aiOffsetX = 0;
+    // mags/reload defaults
+    this.magSize = this.magSize || 8;
+    this.reloadTime = this.reloadTime || 1.2;
+    this.ammoInMag = (this.ammoInMag == null) ? this.magSize : Math.min(this.ammoInMag, this.magSize);
+    this.reloading = false; this.reloadTimer = 0;
+    this.multishotLevel = this.multishotLevel || 0;
+    this.burstLevel = this.burstLevel || 0; this.burstCount = 1; this.burstShotsLeft = 0; this.burstTimer = 0; this.burstInterval = 0.08;
+    this.pellets = 0;
     this.applyCards();
   }
   applyCards() {
@@ -138,6 +146,29 @@ class Player {
     const lsL = clampLevel(L('lifesteal')); if (lsL) this.lifesteal = 6 * lsL;
     const hpL = clampLevel(L('hp')); if (hpL) this.maxHp += 40 * hpL;
 
+    // Tradeoff and shooting abilities
+    this.multishotLevel = clampLevel(L('multishot'));
+    this.burstLevel = clampLevel(L('burst'));
+    const bigMagL = clampLevel(L('bigmag'));
+    const heavyMagL = clampLevel(L('heavymag'));
+    const fastRelL = clampLevel(L('fastreload'));
+    const glassL = clampLevel(L('glasscannon'));
+
+    // Magazine/reload
+    this.magSize = 8 + 4*bigMagL + 6*heavyMagL;
+    this.reloadTime = 1.2 * Math.pow(0.85, fastRelL) * (heavyMagL ? (1 + 0.15*heavyMagL) : 1);
+    this.ammoInMag = Math.min((this.ammoInMag == null ? this.magSize : this.ammoInMag), this.magSize);
+    this.reloading = false; this.reloadTimer = 0;
+
+    // Burst/multishot
+    this.burstCount = this.burstLevel ? (2 + this.burstLevel) : 1; // 3..6 total when Lv1..4
+    this.burstInterval = 0.08; this.burstShotsLeft = 0; this.burstTimer = 0;
+    this.pellets = this.multishotLevel; // extra pellets per shot
+
+    // Tradeoffs
+    if (heavyMagL) this.moveBoost -= 0.1 * heavyMagL;
+    if (glassL) { this.bulletDmg *= (1 + 0.6 * glassL); this.maxHp = Math.max(40, Math.floor(this.maxHp * (1 - 0.15 * glassL))); }
+
     this.hp = Math.min(this.hp, this.maxHp);
   }
 }
@@ -168,6 +199,7 @@ function weightedRarity() {
   return RARITY.Common;
 }
 
+// Abilities list includes new tradeoff abilities
 const ALL_CARDS = [
   { id: 'rapid', title: 'Rapid Fire', desc: 'Reduce fire delay', rarity: RARITY.Common },
   { id: 'power', title: 'High Caliber', desc: 'Increase bullet damage', rarity: RARITY.Rare },
@@ -181,6 +213,12 @@ const ALL_CARDS = [
   { id: 'shield', title: 'Personal Shield', desc: 'Block a bullet periodically', rarity: RARITY.Epic },
   { id: 'lifesteal', title: 'Vampiric Rounds', desc: 'Heal on hit', rarity: RARITY.Rare },
   { id: 'hp', title: 'Toughness', desc: 'Increase max HP', rarity: RARITY.Common },
+  { id: 'multishot', title: 'Multishot', desc: '+1 pellet per level (spread)', rarity: RARITY.Rare },
+  { id: 'burst', title: 'Burst Fire', desc: 'Fires bursts of shots', rarity: RARITY.Epic },
+  { id: 'bigmag', title: 'Bigger Mag', desc: 'Increase magazine size', rarity: RARITY.Common },
+  { id: 'fastreload', title: 'Fast Reload', desc: 'Reduce reload time', rarity: RARITY.Rare },
+  { id: 'heavymag', title: 'Heavy Mag', desc: 'Huge mag, slower reload & movement', rarity: RARITY.Epic },
+  { id: 'glasscannon', title: 'Glass Cannon', desc: 'Big damage, lower max HP', rarity: RARITY.Epic },
 ];
 
 function generateDraftPool(forPlayer) {
