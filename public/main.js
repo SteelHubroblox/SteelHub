@@ -520,6 +520,16 @@ const muzzleFlashes = [];
 function spawnMuzzle(x, y) { muzzleFlashes.push({ x, y, t: 0 }); }
 const trails = [];
 function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
+// Explosions VFX store
+const explosions = [];
+function spawnExplosion(x, y, owner) {
+  explosions.push({ x, y, t: 0, owner });
+  for (let i = 0; i < 16; i++) spawnParticle(x, y, owner.color);
+  addShake(0.12);
+}
+// VFX rings for impacts/jumps
+const rings = [];
+function spawnRing(x, y, color, duration=0.2, radius=18) { rings.push({ x, y, t:0, d:duration, r:radius, color }); }
 
 function update(dt) {
   if (state !== 'playing' || paused) { jumpPressed = false; return; }
