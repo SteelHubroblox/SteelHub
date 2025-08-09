@@ -172,20 +172,10 @@ canvas {
   z-index: 14;
 }
 #mobileControls { display: none; }
-.mc-left, .mc-right { display: flex; gap: 10px; align-items: center; pointer-events: auto; }
-.mc-left { margin-bottom: 8px; }
-.mc-right { margin-bottom: 8px; }
-.mc-btn {
-  width: 56px; height: 56px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2);
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); color: #fff;
-  font-size: 20px; display: grid; place-items: center; cursor: pointer;
-}
-.mc-btn-jump { width: 64px; height: 64px; }
-.mc-btn-shoot { width: 64px; height: 64px; background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)); }
-.mc-stick { width: 120px; height: 120px; border-radius: 60px; border: 1px solid rgba(255,255,255,0.2); position: relative; background: rgba(255,255,255,0.04); }
-.mc-knob { width: 48px; height: 48px; border-radius: 24px; position: absolute; left: 36px; top: 36px; background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.4); }
-
+.mc-left { position: fixed; left: 12px; bottom: 12px; }
+.mc-stick { width: 140px; height: 140px; border-radius: 70px; border: 1px solid rgba(255,255,255,0.25); position: relative; background: rgba(255,255,255,0.05); }
+.mc-knob { width: 56px; height: 56px; border-radius: 28px; position: absolute; left: 42px; top: 42px; background: rgba(255,255,255,0.35); border: 1px solid rgba(255,255,255,0.45); }
 @media (max-width: 900px) {
   #mobileControls.hidden { display: none; }
-  #mobileControls.show { display: flex; }
+  #mobileControls.show { display: block; }
 }

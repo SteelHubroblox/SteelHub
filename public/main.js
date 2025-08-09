@@ -556,12 +556,8 @@ function updateAI(p, dt) {
 
 // Mobile controls
 const mobileControls = document.getElementById('mobileControls');
-const btnLeft = document.getElementById('btnLeft');
-const btnRight = document.getElementById('btnRight');
-const btnJump = document.getElementById('btnJump');
-const btnShoot = document.getElementById('btnShoot');
-const aimStick = document.getElementById('aimStick');
-const aimKnob = document.getElementById('aimKnob');
+const moveStick = document.getElementById('moveStick');
+const moveKnob = document.getElementById('moveKnob');
 let isMobile = false;
 function checkMobile() {
   const touchCapable = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
@@ -570,44 +566,40 @@ function checkMobile() {
 }
 window.addEventListener('resize', checkMobile); checkMobile();
 
-let mobileMoveLeft = false, mobileMoveRight = false, mobileShoot = false;
+let mobileMoveLeft = false, mobileMoveRight = false; let mobileShootTap = null; // {x,y} when tapped
 let aimVec = { x: 1, y: 0 };
 
-function bindHold(el, on, off) {
-  const start = (e) => { e.preventDefault(); on(); };
-  const end = (e) => { e.preventDefault(); off(); };
-  el.addEventListener('touchstart', start, { passive: false });
-  el.addEventListener('touchend', end, { passive: false });
-  el.addEventListener('mousedown', start);
-  el.addEventListener('mouseup', end);
-  el.addEventListener('mouseleave', end);
-}
-
-bindHold(btnLeft, () => mobileMoveLeft = true, () => mobileMoveLeft = false);
-bindHold(btnRight, () => mobileMoveRight = true, () => mobileMoveRight = false);
-bindHold(btnShoot, () => mobileShoot = true, () => mobileShoot = false);
-btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); jumpPressed = true; });
-btnJump.addEventListener('mousedown', (e) => { e.preventDefault(); jumpPressed = true; });
-
-let aiming = false; let aimId = null;
-function stickPosToVec(clientX, clientY) {
-  const rect = aimStick.getBoundingClientRect();
+// Left joystick handling: x controls left/right, y upward triggers jump
+let stickActive = false; let stickId = null;
+function stickToVec(clientX, clientY) {
+  const rect = moveStick.getBoundingClientRect();
   const cx = rect.left + rect.width/2;
   const cy = rect.top + rect.height/2;
-  const dx = clientX - cx; const dy = clientY - cy;
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = dx / len; const ny = dy / len;
+  let dx = clientX - cx; let dy = clientY - cy;
+  const len = Math.hypot(dx, dy);
+  const maxR = rect.width/2 - 28;
+  if (len > maxR) { dx = dx / len * maxR; dy = dy / len * maxR; }
+  moveKnob.style.left = `${rect.width/2 - 28 + dx}px`;
+  moveKnob.style.top = `${rect.height/2 - 28 + dy}px`;
+  const nx = (dx / maxR) || 0; const ny = (dy / maxR) || 0;
   aimVec.x = nx; aimVec.y = ny;
-  const radius = rect.width/2 - 24;
-  aimKnob.style.left = `${rect.width/2 - 24 + nx * radius}px`;
-  aimKnob.style.top = `${rect.height/2 - 24 + ny * radius}px`;
+  mobileMoveLeft = nx < -0.25; mobileMoveRight = nx > 0.25;
+  // Jump if pushing upwards past threshold
+  if (ny < -0.6) jumpPressed = true;
 }
-aimStick.addEventListener('touchstart', (e) => { aiming = true; aimId = e.changedTouches[0].identifier; stickPosToVec(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: false });
-aimStick.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === aimId) stickPosToVec(t.clientX, t.clientY); }, { passive: false });
-aimStick.addEventListener('touchend', (e) => { aiming = false; aimId = null; aimKnob.style.left = '36px'; aimKnob.style.top = '36px'; }, { passive: false });
-aimStick.addEventListener('mousedown', (e) => { aiming = true; stickPosToVec(e.clientX, e.clientY); });
-window.addEventListener('mousemove', (e) => { if (aiming) stickPosToVec(e.clientX, e.clientY); });
-window.addEventListener('mouseup', () => { if (aiming) { aiming = false; aimKnob.style.left = '36px'; aimKnob.style.top = '36px'; } });
+function resetStick() { moveKnob.style.left = '42px'; moveKnob.style.top = '42px'; aimVec.x = 0; aimVec.y = 0; mobileMoveLeft = mobileMoveRight = false; }
+moveStick?.addEventListener('touchstart', (e) => { stickActive = true; stickId = e.changedTouches[0].identifier; stickToVec(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: false });
+moveStick?.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === stickId) stickToVec(t.clientX, t.clientY); }, { passive: false });
+moveStick?.addEventListener('touchend', () => { stickActive = false; resetStick(); }, { passive: false });
+moveStick?.addEventListener('mousedown', (e) => { stickActive = true; stickToVec(e.clientX, e.clientY); });
+window.addEventListener('mousemove', (e) => { if (stickActive) stickToVec(e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => { if (stickActive) { stickActive = false; resetStick(); } });
+
+// Right-side tap to shoot toward tap position
+function isRightSideTap(e) { const x = (e.touches? e.touches[0].clientX : e.clientX); return x > window.innerWidth * 0.55; }
+function tapPos(e) { const t = e.touches? e.touches[0] : e; return { x: t.clientX, y: t.clientY }; }
+window.addEventListener('touchstart', (e) => { if (!isMobile) return; if (isRightSideTap(e)) { mobileShootTap = tapPos(e); }}, { passive: false });
+window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRightSideTap(e)) { mobileShootTap = tapPos(e); } });
 
 // Visual effects: muzzle flashes and bullet trails
 const muzzleFlashes = [];
@@ -672,17 +664,30 @@ function update(dt) {
 
       if (keys.has('KeyR') && !p.reloading && p.ammoInMag < p.magSize) { p.reloading = true; p.reloadTimer = p.reloadTime; }
 
-      // Aim and shooting (same as before)...
-      let dirX, dirY;
-      if (isMobile && (aiming || true)) { dirX = aimVec.x || p.facing; dirY = aimVec.y || 0; }
-      else { const ax = mouseX - (p.x + p.w / 2); const ay = mouseY - (p.y + p.h * 0.35); const len = Math.hypot(ax, ay) || 1; dirX = ax / len; dirY = ay / len; }
+      // Aim and shooting
+      let dirX = p.facing, dirY = 0;
+      if (isMobile && mobileShootTap) {
+        const ax = mobileShootTap.x - (p.x + p.w/2);
+        const ay = mobileShootTap.y - (p.y + p.h*0.35);
+        const len = Math.hypot(ax, ay) || 1; dirX = ax/len; dirY = ay/len;
+      } else if (!isMobile) {
+        const ax = mouseX - (p.x + p.w / 2);
+        const ay = mouseY - (p.y + p.h * 0.35);
+        const len = Math.hypot(ax, ay) || 1; dirX = ax / len; dirY = ay / len;
+      } else {
+        dirX = (Math.abs(aimVec.x) > 0.1 ? aimVec.x : p.facing); dirY = 0;
+      }
       p.facing = Math.sign(dirX) || p.facing;
 
       p.reload -= dt;
       if (p.burstShotsLeft > 0) { p.burstTimer -= dt; if (p.burstTimer <= 0 && p.ammoInMag > 0) { fireShot(p, dirX, dirY); p.burstShotsLeft--; p.burstTimer = p.burstInterval; } }
-      const wantShoot = (mouseDown || mobileShoot) && !p.reloading;
-      if (wantShoot && p.reload <= 0 && p.ammoInMag > 0) { fireShot(p, dirX, dirY); p.reload = p.fireDelay; if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; } }
-      else if (wantShoot && p.ammoInMag === 0 && !p.reloading) { p.reloading = true; p.reloadTimer = p.reloadTime; }
+      const wantShoot = (!isMobile && mouseDown) || (isMobile && !!mobileShootTap);
+      if (wantShoot && p.reload <= 0 && p.ammoInMag > 0 && !p.reloading) {
+        fireShot(p, dirX, dirY);
+        p.reload = p.fireDelay;
+        if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; }
+      } else if (wantShoot && p.ammoInMag === 0 && !p.reloading) { p.reloading = true; p.reloadTimer = p.reloadTime; }
+      mobileShootTap = null; // consume tap
     } else {
       // AI hazard pre-check ahead handled in updateAI; reload when empty
       if (!p.reloading && p.ammoInMag === 0) { p.reloading = true; p.reloadTimer = p.reloadTime; }
