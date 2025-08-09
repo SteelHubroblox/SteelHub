@@ -639,6 +639,20 @@ function updatePlatforms(dt) {
   }
 }
 
+// Ambient/environment particles
+let envTimer = 0;
+function updateEnvironment(dt) {
+  envTimer -= dt;
+  if (envTimer <= 0) {
+    envTimer = randRange(0.2, 0.6);
+    const side = Math.random() < 0.5 ? 0 : 1;
+    const x = side ? canvas.width + 10 : -10;
+    const y = randRange(40, canvas.height * 0.7);
+    const color = currentPalette.accent + '99';
+    particles.push({ x, y, vx: side ? -randRange(30,80) : randRange(30,80), vy: randRange(-10,10), life: 1.2, maxLife: 1.2, color, size: randRange(2,3), rot: 0, rotV: 0, type: 'puff', drag: 0.995, grav: 0 });
+  }
+}
+
 function update(dt) {
   if (state !== 'playing' || paused) { jumpPressed = false; return; }
   simTime += dt;
