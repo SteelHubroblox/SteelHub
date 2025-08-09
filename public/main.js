@@ -22,7 +22,9 @@ const MAX_VX = 380;
 const AIR_CTRL = 0.7;
 const FRICTION = 12;
 
-const ROUND_WIN = 3;
+const SERIES_WINS_TARGET = 3; // best of 5 (first to 3)
+const ROUND_BEST_OF = 3; // best of 3 per round (first to 2)
+let roundWins = [0, 0];
 
 // Input
 const keys = new Set();
@@ -258,18 +260,27 @@ let shakeT = 0;
 function addShake(s) { shakeT = Math.min(0.3, shakeT + s); }
 
 function endRound(winnerIdx) {
-  scores[winnerIdx]++;
-  if (scores[winnerIdx] >= ROUND_WIN) {
-    state = 'menu';
-    menu.classList.remove('hidden');
-    startButton.textContent = `P${winnerIdx + 1} wins! Play again`;
-    scores = [0, 0];
-    players.forEach(p => { p.cards = []; });
+  roundWins[winnerIdx]++;
+  const need = Math.ceil(ROUND_BEST_OF / 2);
+  if (roundWins[winnerIdx] >= need) {
+    scores[winnerIdx]++;
+    roundWins = [0, 0];
+    // Between rounds: draft
+    state = 'between';
+    openDraft(winnerIdx === 0 ? 1 : 0); // loser picks first
+    // Check series end
+    if (scores[winnerIdx] >= SERIES_WINS_TARGET) {
+      state = 'menu';
+      menu.classList.remove('hidden');
+      startButton.textContent = `P${winnerIdx + 1} wins the series! Play again`;
+      scores = [0, 0];
+      players.forEach(p => { p.cards = []; });
+      return;
+    }
     return;
   }
-  // Between rounds: draft
-  state = 'between';
-  openDraft(winnerIdx === 0 ? 1 : 0); // loser picks first
+  // Continue same round without draft
+  doStartMatch();
 }
 
 function openDraft(firstPickerIdx) {
