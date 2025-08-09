@@ -227,51 +227,74 @@ function overlayHideDraft() { draftOverlay.classList.add('hidden'); }
 
 // Multiple arenas
 let currentArena = 0;
+// Dynamic palettes per arena
+const PALETTES = [
+  { bgTop: '#11243a', bgBot: '#1b3660', platTop: '#4a607a', platBot: '#32465e', accent: '#ffd166', spike: '#ff6b6b' },
+  { bgTop: '#1a1633', bgBot: '#312b6b', platTop: '#6b5ca5', platBot: '#4c437a', accent: '#ffdf6e', spike: '#ff8a80' },
+  { bgTop: '#0f2a28', bgBot: '#184b46', platTop: '#4f8a83', platBot: '#2f5e59', accent: '#ffe082', spike: '#ff6f61' },
+  { bgTop: '#26130f', bgBot: '#4b261c', platTop: '#8a5648', platBot: '#5a3a30', accent: '#ffd54f', spike: '#ff7043' },
+];
+let currentPalette = PALETTES[0];
+
+// Hazards
+let hazards = [];
+
 function buildArena(idx) {
   const w = canvas.width, h = canvas.height;
+  currentPalette = PALETTES[idx % PALETTES.length];
+  hazards = [];
   const groundY = h - 60;
-  const step = Math.min(140, Math.max(110, (JUMP_V * JUMP_V) / (2 * G) - 20));
-  const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step;
+  const step = Math.min(200, Math.max(120, (JUMP_V * JUMP_V) / (2 * G) - 10));
+  const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step; const top4 = top3 - step;
+  const ph = 18;
   if (idx === 0) {
-    // Classic reachable tiers
+    // Classic+ bigger
     platforms = [
       { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.20, y: top1, w: 220, h: 16 },
-      { x: w * 0.58, y: top1 - 10, w: 260, h: 16 },
-      { x: w * 0.14, y: top2, w: 180, h: 16 },
-      { x: w * 0.56, y: top2 - 10, w: 220, h: 16 },
+      { x: w * 0.12, y: top1, w: 260, h: ph },
+      { x: w * 0.62, y: top1 - 10, w: 320, h: ph },
+      { x: w * 0.10, y: top2, w: 220, h: ph },
+      { x: w * 0.55, y: top2 - 10, w: 260, h: ph },
+      { x: w * 0.32, y: top3, w: 260, h: ph },
     ];
+    // Spikes at edges
+    addSpikeRow(0, groundY - 16, 120, 16);
+    addSpikeRow(w - 120, groundY - 16, 120, 16);
   } else if (idx === 1) {
-    // Towers reachable by steps
-    const pw = 180, ph = 16;
-    platforms = [
-      { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.18, y: top1, w: pw, h: ph },
-      { x: w * 0.18, y: top2, w: pw, h: ph },
-      { x: w * 0.64, y: top1 + 10, w: pw, h: ph },
-      { x: w * 0.64, y: top2 + 10, w: pw, h: ph },
-      { x: w * 0.40, y: top1 - 20, w: 220, h: ph },
-    ];
-  } else if (idx === 2) {
-    // Bridges reachable from ground
+    // Multi-bridge
     platforms = [
       { x: 0, y: groundY, w, h: 60 },
       { x: w * 0.05, y: top1, w: w * 0.9, h: 14 },
-      { x: w * 0.2, y: top2, w: 180, h: 14 },
-      { x: w * 0.6, y: top2 - 10, w: 200, h: 14 },
+      { x: w * 0.18, y: top2 + 10, w: 240, h: 14 },
+      { x: w * 0.58, y: top2, w: 280, h: 14 },
+      { x: w * 0.38, y: top3 + 10, w: 220, h: 14 },
     ];
-  } else {
-    // Pyramids reachable
-    const ph = 16;
+    addSpikeRow(w * 0.4, groundY - 16, w * 0.2, 16);
+  } else if (idx === 2) {
+    // Towers & gaps
     platforms = [
       { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.2, y: top1 + 10, w: 160, h: ph },
-      { x: w * 0.17, y: top2 + 10, w: 220, h: ph },
-      { x: w * 0.14, y: top3 + 10, w: 280, h: ph },
-      { x: w * 0.66, y: top1, w: 200, h: ph },
-      { x: w * 0.62, y: top2, w: 260, h: ph },
-      { x: w * 0.58, y: top3, w: 320, h: ph },
+      { x: w * 0.12, y: top1, w: 220, h: ph },
+      { x: w * 0.12, y: top2, w: 200, h: ph },
+      { x: w * 0.12, y: top3, w: 180, h: ph },
+      { x: w * 0.68, y: top1, w: 240, h: ph },
+      { x: w * 0.68, y: top2, w: 220, h: ph },
+      { x: w * 0.68, y: top3, w: 200, h: ph },
+      { x: w * 0.40, y: top2 + 10, w: 260, h: ph },
     ];
+    addSpikeRow(w * 0.48, groundY - 16, 100, 16);
+  } else {
+    // Pyramid & central hazard
+    platforms = [
+      { x: 0, y: groundY, w, h: 60 },
+      { x: w * 0.2, y: top1 + 10, w: 200, h: ph },
+      { x: w * 0.16, y: top2 + 10, w: 260, h: ph },
+      { x: w * 0.12, y: top3 + 10, w: 320, h: ph },
+      { x: w * 0.66, y: top1, w: 240, h: ph },
+      { x: w * 0.62, y: top2, w: 300, h: ph },
+      { x: w * 0.58, y: top3, w: 360, h: ph },
+    ];
+    addSpikeRow(w * 0.45, groundY - 16, w * 0.1, 16);
   }
 }
 
@@ -502,6 +525,9 @@ function update(dt) {
     const p = players[pi];
     const isAI = !!p.controls.ai;
 
+    // Reload handling
+    if (p.reloading) { p.reloadTimer -= dt; if (p.reloadTimer <= 0) { p.reloading = false; p.ammoInMag = p.magSize; } }
+
     if (!isAI) {
       const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
       const moveLeft = keys.has('KeyA') || mobileMoveLeft;
@@ -515,7 +541,13 @@ function update(dt) {
         p.vy = -JUMP_V * (1 + p.jumpBoost);
         p.onGround = false;
         p.jumpsUsed++;
+        // jump VFX
+        spawnRing(p.x + p.w/2, p.y + p.h, currentPalette.accent, 0.25, 14);
+        for (let i=0;i<8;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color);
       }
+
+      // Manual reload
+      if (keys.has('KeyR') && !p.reloading && p.ammoInMag < p.magSize) { p.reloading = true; p.reloadTimer = p.reloadTime; }
 
       // Aim
       let dirX, dirY;
@@ -528,40 +560,57 @@ function update(dt) {
       p.facing = Math.sign(dirX) || p.facing;
 
       p.reload -= dt;
-      const wantShoot = mouseDown || mobileShoot;
-      if (wantShoot && p.reload <= 0) {
-        const vx = dirX * p.bulletSpeed;
-        const vy = dirY * p.bulletSpeed;
-        bullets.push(new Bullet(p, p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35, vx, vy, p.bulletDmg, p.color));
+
+      // Burst sequencing
+      if (p.burstShotsLeft > 0) {
+        p.burstTimer -= dt;
+        if (p.burstTimer <= 0 && p.ammoInMag > 0) {
+          fireShot(p, dirX, dirY);
+          p.burstShotsLeft--; p.burstTimer = p.burstInterval;
+        }
+      }
+
+      const wantShoot = (mouseDown || mobileShoot) && !p.reloading;
+      if (wantShoot && p.reload <= 0 && p.ammoInMag > 0) {
+        fireShot(p, dirX, dirY);
         p.reload = p.fireDelay;
-        p.vx -= Math.sign(vx) * (p.knockback / 14);
-        addShake(0.05);
-        spawnMuzzle(p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35);
-        spawnTrail(p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35, p.color);
+        if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; }
+      } else if (wantShoot && p.ammoInMag === 0 && !p.reloading) {
+        p.reloading = true; p.reloadTimer = p.reloadTime;
       }
     } else {
+      // AI pathing avoid hazards: if hazard directly ahead at feet, jump
+      const lookAhead = 40 * Math.sign(p.vx || 1);
+      const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 20, h: 10 };
+      let dangerAhead = false;
+      for (const hz of hazards) if (rectsIntersect(feetBox, hz)) { dangerAhead = true; break; }
+      if (dangerAhead && p.onGround) { p.vy = -JUMP_V * 0.95; p.onGround = false; }
+
+      // AI reload if empty
+      if (!p.reloading && p.ammoInMag === 0) { p.reloading = true; p.reloadTimer = p.reloadTime; }
+
       updateAI(p, dt);
     }
 
-    if (p.shieldCooldownMax > 0) {
-      p.shieldCooldown -= dt; if (p.shieldCooldown <= 0) { p.shieldCooldown = p.shieldCooldownMax; p.shieldCharges = Math.min((p.shieldCharges||0) + 1, p.shieldCapacity || 1); }
-    }
+    // Shields
+    if (p.shieldCooldownMax > 0) { p.shieldCooldown -= dt; if (p.shieldCooldown <= 0) { p.shieldCooldown = p.shieldCooldownMax; p.shieldCharges = Math.min((p.shieldCharges||0) + 1, p.shieldCapacity || 1); } }
 
+    // gravity & integrate
     p.vy += G * dt;
     p.x += p.vx * dt;
     const bboxX = { x: p.x, y: p.y, w: p.w, h: p.h };
-    for (const s of platforms) if (rectsIntersect(bboxX, s)) {
-      if (p.vx > 0) p.x = s.x - p.w; else if (p.vx < 0) p.x = s.x + s.w;
-      p.vx = 0;
-    }
-
+    for (const s of platforms) if (rectsIntersect(bboxX, s)) { if (p.vx > 0) p.x = s.x - p.w; else if (p.vx < 0) p.x = s.x + s.w; p.vx = 0; }
     p.y += p.vy * dt;
+    const prevOnGround = p.onGround;
     p.onGround = false;
     const bboxY = { x: p.x, y: p.y, w: p.w, h: p.h };
-    for (const s of platforms) if (rectsIntersect(bboxY, s)) {
-      if (p.vy > 0) { p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0; } else if (p.vy < 0) { p.y = s.y + s.h; }
-      p.vy = 0;
-    }
+    for (const s of platforms) if (rectsIntersect(bboxY, s)) { if (p.vy > 0) { p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0; } else if (p.vy < 0) { p.y = s.y + s.h; } p.vy = 0; }
+
+    // Land VFX
+    if (!prevOnGround && p.onGround) { spawnRing(p.x + p.w/2, p.y + p.h, '#ffffff', 0.2, 12); for (let i=0;i<10;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color); }
+
+    // Hazards damage
+    if (playerHitsHazard(p)) { p.hp -= 40*dt; spawnParticle(p.x + p.w/2, p.y + p.h, currentPalette.spike); }
 
     p.x = clamp(p.x, 0, canvas.width - p.w);
     if (p.onGround) p.vx -= p.vx * FRICTION * dt;
@@ -576,6 +625,7 @@ function update(dt) {
     const bb = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
     let hitGeom = false;
     for (const s of platforms) if (rectsIntersect(bb, s)) { hitGeom = true; if (b.bounces > 0) { b.vy = -Math.abs(b.vy) * 0.7; b.bounces--; hitGeom = false; } else if (b.owner.explosiveLevel > 0) { spawnExplosion(b.x, b.y, b.owner); } break; }
+    for (const hz of hazards) if (rectsIntersect(bb, hz)) { hitGeom = true; break; }
     if (hitGeom) { bullets.splice(i, 1); continue; }
     if (b.x < -50 || b.x > canvas.width + 50 || b.y > canvas.height + 200) { bullets.splice(i, 1); continue; }
     for (const p of players) {
@@ -585,68 +635,52 @@ function update(dt) {
         p.hp -= b.dmg;
         if (b.owner.lifesteal) b.owner.hp = clamp((b.owner.hp||100) + b.owner.lifesteal, 0, b.owner.maxHp||100);
         p.vx += Math.sign(b.vx) * 80; p.vy -= 120;
+        // Impact VFX
         spawnParticle(b.x, b.y, b.color);
-        addShake(0.07);
+        spawnRing(b.x, b.y, currentPalette.accent, 0.18, 16);
+        addShake(0.08);
         if (b.pierces > 0) { b.pierces--; } else { bullets.splice(i, 1); }
         break;
       }
     }
   }
 
-  // Explosions
-  if (explosions.length) {
-    for (let ei = explosions.length - 1; ei >= 0; ei--) {
-      const e = explosions[ei];
-      e.t += dt; if (e.t > 0.25) { explosions.splice(ei,1); continue; }
-      for (const p of players) {
-        const cx = p.x + p.w/2, cy = p.y + p.h/2;
-        const d2 = (cx - e.x)**2 + (cy - e.y)**2;
-        const radius = 80 + 20 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
-        const dmgBase = 20 + 8 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
-        if (d2 < radius*radius) { p.hp -= dmgBase * dt * 4; }
-      }
+  // Explosions, particles updated already elsewhere
+  for (let ei = explosions.length - 1; ei >= 0; ei--) {
+    const e = explosions[ei]; e.t += dt; if (e.t > 0.25) { explosions.splice(ei,1); continue; }
+    for (const p of players) {
+      const cx = p.x + p.w/2, cy = p.y + p.h/2; const d2 = (cx - e.x)**2 + (cy - e.y)**2;
+      const radius = 80 + 20 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
+      const dmgBase = 20 + 8 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
+      if (d2 < radius*radius) { p.hp -= dmgBase * dt * 4; }
     }
   }
 
-  // Particles
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i]; p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
-    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 800 * dt;
-  }
-
-  // Update trails
+  // Trails, muzzle, rings
   for (let i = trails.length - 1; i >= 0; i--) { trails[i].life -= dt; if (trails[i].life <= 0) trails.splice(i, 1); }
-  // Update muzzle flashes
   for (let i = muzzleFlashes.length - 1; i >= 0; i--) { muzzleFlashes[i].t += dt; if (muzzleFlashes[i].t > 0.08) muzzleFlashes.splice(i, 1); }
+  for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.t += dt; if (r.t > r.d) rings.splice(i, 1); }
 
   const alive = players.map(p => p.hp > 0);
-  if (alive.filter(Boolean).length <= 1) {
-    const winIdx = alive[0] ? 0 : 1;
-    endRound(winIdx);
-  }
+  if (alive.filter(Boolean).length <= 1) { const winIdx = alive[0] ? 0 : 1; endRound(winIdx); }
   jumpPressed = false;
 }
 
-const explosions = [];
-function spawnExplosion(x, y, owner) {
-  const r = 80; const dmg = 20;
-  explosions.push({ x, y, r, dmg, t: 0, owner });
-  for (let i=0;i<16;i++) spawnParticle(x, y, owner.color);
-  addShake(0.12);
-}
-
-function drawRoundedRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
+function fireShot(p, dirX, dirY) {
+  if (p.ammoInMag <= 0) return;
+  const originX = p.x + p.w / 2 + p.facing * 12;
+  const originY = p.y + p.h * 0.35;
+  const pellets = 1 + (p.pellets || 0);
+  for (let k = 0; k < pellets; k++) {
+    const spread = (p.pellets ? randRange(-0.12, 0.12) : 0); // radians approx ±7°
+    const ang = Math.atan2(dirY, dirX) + spread;
+    const vx = Math.cos(ang) * p.bulletSpeed;
+    const vy = Math.sin(ang) * p.bulletSpeed;
+    bullets.push(new Bullet(p, originX, originY, vx, vy, p.bulletDmg, p.color));
+    spawnTrail(originX, originY, p.color);
+  }
+  p.ammoInMag--;
+  spawnMuzzle(originX, originY);
 }
 
 // Drawing polish: player head
@@ -674,18 +708,16 @@ function drawPlayer(p) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // nicer background
-  const gTop = '#0e1a2a', gBot = '#1a2d4f';
+  const gTop = currentPalette.bgTop, gBot = currentPalette.bgBot;
   const gr = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gr.addColorStop(0, gTop); gr.addColorStop(1, gBot);
   ctx.fillStyle = gr; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   let sx = 0, sy = 0; if (shakeT > 0) { sx = (Math.random()-0.5)*10*shakeT; sy=(Math.random()-0.5)*10*shakeT; ctx.save(); ctx.translate(sx, sy); }
 
-  // platforms with shadows
   for (const s of platforms) drawPlatform(s);
+  drawHazards();
 
-  // explosions
   for (const e of explosions) {
     const radius = 80 + 20 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
     const alpha = Math.max(0, 1 - e.t / 0.25);
@@ -696,41 +728,27 @@ function draw() {
   }
 
   for (const p of players) drawPlayer(p);
+  for (const b of bullets) { const grd2 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.8); grd2.addColorStop(0, b.color); grd2.addColorStop(1, '#ffffff00'); ctx.fillStyle = grd2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
+  for (const pr of particles) { ctx.globalAlpha = Math.max(0, pr.life / 0.6); ctx.fillStyle = pr.color; ctx.fillRect(pr.x, pr.y, 2, 2); ctx.globalAlpha = 1; }
 
-  for (const b of bullets) {
-    const grd2 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.8);
-    grd2.addColorStop(0, b.color); grd2.addColorStop(1, '#ffffff00');
-    ctx.fillStyle = grd2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / 0.6); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 2, 2); ctx.globalAlpha = 1; }
-
-  // Draw trails
-  for (const tr of trails) {
-    ctx.globalAlpha = Math.max(0, tr.life / 0.25);
-    const g = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 30);
-    g.addColorStop(0, tr.color);
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tr.x, tr.y, 30, 0, Math.PI*2); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-  // Draw muzzle flashes
-  for (const m of muzzleFlashes) {
-    const a = Math.max(0, 1 - m.t / 0.08);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = '#ffd27d';
-    ctx.beginPath(); ctx.arc(m.x, m.y, 10, 0, Math.PI*2); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  // trails
+  for (const tr of trails) { ctx.globalAlpha = Math.max(0, tr.life / 0.25); const g2 = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 30); g2.addColorStop(0, tr.color); g2.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(tr.x, tr.y, 30, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+  // muzzle
+  for (const m of muzzleFlashes) { const a = Math.max(0, 1 - m.t / 0.08); ctx.globalAlpha = a; ctx.fillStyle = '#ffd27d'; ctx.beginPath(); ctx.arc(m.x, m.y, 10, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+  // rings
+  for (const r of rings) { const t = r.t / r.d; ctx.strokeStyle = r.color; ctx.globalAlpha = Math.max(0, 1 - t); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (1 + t*2), 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1; }
 
   if (shakeT > 0) ctx.restore();
-
   drawVignette();
 
-  // HUD (without engagement text)
+  // HUD (Round & Series) + Ammo
   ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui, sans-serif';
-  ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI`,
-    Math.max(12, canvas.width/2 - 180), 28);
+  ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI`, Math.max(12, canvas.width/2 - 180), 28);
+  // Ammo HUD bottom-left
+  const p1 = players[0];
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui, sans-serif';
+  const reloadTxt = p1.reloading ? ' (reloading...)' : '';
+  ctx.fillText(`Ammo: ${p1.ammoInMag}/${p1.magSize}${reloadTxt}`, 12, canvas.height - 16);
 }
 
 function loop() {
@@ -757,12 +775,29 @@ function drawPlatform(s) {
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   drawRoundedRect(Math.floor(s.x)+3, Math.floor(s.y)+6, Math.floor(s.w), Math.floor(s.h), 8); ctx.fill();
-  // top
+  // top gradient from palette
   const g = ctx.createLinearGradient(0, s.y, 0, s.y + s.h);
-  g.addColorStop(0, '#3b4258'); g.addColorStop(1, '#2b3346');
+  g.addColorStop(0, currentPalette.platTop); g.addColorStop(1, currentPalette.platBot || '#2b3346');
   ctx.fillStyle = g; drawRoundedRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h), 8); ctx.fill();
-  // border
   ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; drawRoundedRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h), 8); ctx.stroke();
+}
+
+function drawHazards() {
+  for (const hz of hazards) {
+    if (hz.type === 'spike') {
+      // draw a strip of triangles
+      const step = 16; const num = Math.max(1, Math.floor(hz.w / step));
+      for (let i = 0; i < num; i++) {
+        const x0 = hz.x + i * step;
+        ctx.fillStyle = currentPalette.spike;
+        ctx.beginPath();
+        ctx.moveTo(x0, hz.y + hz.h);
+        ctx.lineTo(x0 + step/2, hz.y);
+        ctx.lineTo(x0 + step, hz.y + hz.h);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
 }
 
 function drawVignette() {
