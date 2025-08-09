@@ -35,10 +35,10 @@ jobs:
       - name: Install Bubblewrap
         run: npm i -g @bubblewrap/cli
 
-      - name: Init TWA project
+      - name: Init TWA project (from local manifest)
         run: |
           rm -rf twa
-          yes "" | bubblewrap init --manifest "$SITE_URL/manifest.webmanifest" --directory twa --skipSigning || true
+          yes "" | bubblewrap init --manifest manifest.webmanifest --directory twa --skipSigning || true
 
       - name: Generate upload keystore
         run: |
