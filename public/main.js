@@ -624,22 +624,6 @@ function tapPos(e) { const t = e.touches? e.touches[0] : e; return { x: t.client
 window.addEventListener('touchstart', (e) => { if (!isMobile) return; if (isRightSideTap(e)) { mobileShootTap = tapPos(e); }}, { passive: false });
 window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRightSideTap(e)) { mobileShootTap = tapPos(e); } });
 
-// Visual effects: muzzle flashes and bullet trails
-const muzzleFlashes = [];
-function spawnMuzzle(x, y) { muzzleFlashes.push({ x, y, t: 0 }); }
-const trails = [];
-function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
-// Explosions VFX store
-const explosions = [];
-function spawnExplosion(x, y, owner) {
-  explosions.push({ x, y, t: 0, owner });
-  for (let i = 0; i < 16; i++) spawnSpark(x, y, owner.color);
-  addShake(0.12);
-}
-// VFX rings for impacts/jumps
-const rings = [];
-function spawnRing(x, y, color, duration=0.2, radius=18) { rings.push({ x, y, t:0, d:duration, r:radius, color }); }
-
 function updatePlatforms(dt) {
   for (const s of platforms) {
     if (s.move) {
@@ -660,6 +644,7 @@ function update(dt) {
   simTime += dt;
   shakeT = Math.max(0, shakeT - dt);
   updatePlatforms(dt);
+  updateEnvironment(dt);
 
   for (let pi = 0; pi < players.length; pi++) {
     const p = players[pi];
