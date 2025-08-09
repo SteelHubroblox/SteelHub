@@ -242,6 +242,13 @@ let hazards = [];
 // Define spike helper before buildArena
 function addSpikeRow(x, y, w, h) { hazards.push({ x, y, w, h, type: 'spike' }); }
 
+function rectIntersectObj(p, o) { return p.x < o.x + o.w && p.x + p.w > o.x && p.y < o.y + o.h && p.y + p.h > o.y; }
+function playerHitsHazard(p) {
+  const bbox = { x: p.x, y: p.y, w: p.w, h: p.h };
+  for (const hz of hazards) { if (rectIntersectObj(bbox, hz)) return true; }
+  return false;
+}
+
 // Arena builder with larger layouts and spike hazards
 function buildArena(idx) {
   const w = canvas.width, h = canvas.height;
