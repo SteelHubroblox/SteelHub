@@ -173,6 +173,8 @@ function init() {
 
     controls = new PointerLockControls(camera, document.body);
     controls.pointerSpeed = 0.3;
+    // Look slightly downward by default so you see the ground/city
+    camera.rotation.x = -0.3;
 
     startButton.addEventListener('click', () => {
       try { controls.lock(); } catch (e) { console.warn('PointerLock lock failed, starting anyway', e); }
@@ -279,7 +281,7 @@ function updateSunUniforms(elevation01, azimuth01) {
 function setupWorldAndCity() {
   worldOctree = new Octree();
   const groundGeo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
-  const groundMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 1.0, metalness: 0.0 });
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a4f58, roughness: 0.95, metalness: 0.05 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -360,7 +362,7 @@ function buildCityGrid() {
 
 function buildRoadMeshes(group, nodes, edges) {
   const RW = city.roadWidth;
-  const matRoad = new THREE.MeshStandardMaterial({ color: 0x212121, roughness: 0.95, metalness: 0.05 });
+  const matRoad = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.9, metalness: 0.1 });
   const matLane = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
   // Build quads for each edge
@@ -670,6 +672,8 @@ function pickNeighboringNode(node) {
 function setupPlayer() {
   playerCollider = new Capsule(new THREE.Vector3(0, 1.0, 0), new THREE.Vector3(0, 2.6, 0), 0.35);
   resetPlayerPosition();
+  // place camera to a better start spot near a block edge
+  camera.position.set(15, 1.7, 15);
 }
 
 function resetPlayerPosition() {
@@ -812,7 +816,7 @@ function animate() {
     params.sunAzimuth = (params.sunAzimuth + dt * daySpeed * 0.02) % 1;
     params.sunElevation = (params.sunElevation + dt * daySpeed) % 1;
   }
-  updateSunUniforms(params.sunElevation, params.sunAzimuth);
+  if (HasSky) updateSunUniforms(params.sunElevation, params.sunAzimuth);
   updateNightLighting();
 
   // Update systems
