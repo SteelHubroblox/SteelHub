@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-CHANGE-ME';
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 // DB
 const db = new Database(path.join(__dirname, 'data.db'));
@@ -49,6 +49,10 @@ const init = () => {
       completedAt TEXT,
       UNIQUE(userId, lessonId)
     );
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 };
 init();
@@ -60,6 +64,14 @@ function getWeekId(d=new Date()) {
   const days = Math.floor((d - firstJan) / 86400000);
   const week = Math.floor((days + firstJan.getUTCDay()+6)/7); // ISO-ish
   return `${year}-W${week}`;
+}
+
+function getMeta(key) {
+  const row = db.prepare('SELECT value FROM meta WHERE key=?').get(key);
+  return row?.value || null;
+}
+function setMeta(key, value) {
+  db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value);
 }
 
 function authMiddleware(req,res,next){
@@ -78,16 +90,9 @@ function resetDailyIfNeeded(user){
     user.lastGemsReset = today;
     db.prepare('UPDATE users SET gems=?, lastGemsReset=? WHERE id=?').run(user.gems, user.lastGemsReset, user.id);
   }
-  // reset ad counters daily
   if(user.adDay !== today){
     user.adDay = today; user.adCountDay = 0;
     db.prepare('UPDATE users SET adDay=?, adCountDay=0 WHERE id=?').run(today, user.id);
-  }
-  // reset weekly XP
-  const weekId = getWeekId();
-  if(user.weekId !== weekId){
-    user.weekId = weekId; user.xpWeek = 0;
-    db.prepare('UPDATE users SET weekId=?, xpWeek=0 WHERE id=?').run(weekId, user.id);
   }
 }
 
@@ -96,6 +101,43 @@ function getUserById(id){
   if(user) resetDailyIfNeeded(user);
   return user;
 }
+
+const LEAGUE_TIERS = ['Bronze','Silver','Gold','Diamond'];
+
+function doWeeklyRolloverIfNeeded() {
+  const currentWeek = getWeekId();
+  const lastRolloverWeek = getMeta('lastRolloverWeek');
+  if (!lastRolloverWeek) { setMeta('lastRolloverWeek', currentWeek); return; }
+  if (lastRolloverWeek === currentWeek) return;
+
+  // Promotions/demotions based on last week's xpWeek (currently stored)
+  for (const tier of LEAGUE_TIERS) {
+    const users = db.prepare('SELECT id, xpWeek FROM users WHERE league=? ORDER BY xpWeek DESC, id ASC').all(tier);
+    const n = users.length;
+    if (n === 0) continue;
+    const moveCount = Math.max(3, Math.floor(n * 0.2)); // top/bottom 20% with minimum 3
+    const top = users.slice(0, moveCount);
+    const bottom = users.slice(-moveCount);
+    const tierIdx = LEAGUE_TIERS.indexOf(tier);
+    // Promote top (unless already at highest)
+    if (tierIdx < LEAGUE_TIERS.length - 1) {
+      const newTier = LEAGUE_TIERS[tierIdx + 1];
+      top.forEach(u => db.prepare('UPDATE users SET league=? WHERE id=?').run(newTier, u.id));
+    }
+    // Demote bottom (unless already at lowest)
+    if (tierIdx > 0) {
+      const newTier = LEAGUE_TIERS[tierIdx - 1];
+      bottom.forEach(u => db.prepare('UPDATE users SET league=? WHERE id=?').run(newTier, u.id));
+    }
+  }
+
+  // Reset weekly XP for everyone and set their weekId to current
+  db.prepare('UPDATE users SET xpWeek=0, weekId=?').run(currentWeek);
+  setMeta('lastRolloverWeek', currentWeek);
+}
+
+// Run rollover on startup
+doWeeklyRolloverIfNeeded();
 
 // Auth
 app.post('/api/auth/register', (req,res)=>{
@@ -134,6 +176,7 @@ app.post('/api/auth/logout', (req,res)=>{
 
 // Profile
 app.get('/api/profile', authMiddleware, (req,res)=>{
+  doWeeklyRolloverIfNeeded();
   const user = getUserById(req.userId);
   if(!user) return res.status(404).json({error:'not_found'});
   res.json({ user: { id:user.id, name:user.name, email:user.email, avatar:user.avatar, xp:user.xp, gems:user.gems, league:user.league, xpWeek:user.xpWeek } });
@@ -194,11 +237,12 @@ app.post('/api/ads/reward', authMiddleware, (req,res)=>{
 
 // Leaderboard: weekly by league
 app.get('/api/leaderboard', (req,res)=>{
+  doWeeklyRolloverIfNeeded();
   const scope = req.query.scope || 'weekly';
   const league = req.query.league || 'Bronze';
   if (scope !== 'weekly') return res.status(400).json({error:'unsupported_scope'});
   const weekId = getWeekId();
-  const top = db.prepare('SELECT name, avatar, xpWeek as xp FROM users WHERE weekId=? AND league=? ORDER BY xpWeek DESC LIMIT 50').all(weekId, league);
+  const top = db.prepare('SELECT name, avatar, xpWeek as xp FROM users WHERE league=? ORDER BY xpWeek DESC LIMIT 50').all(league);
   res.json({ weekId, league, top });
 });
 
