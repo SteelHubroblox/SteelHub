@@ -85,6 +85,22 @@ const Storage = {
   },
 };
 
+// Simple API client (same-origin)
+const Api = {
+  async get(path) {
+    const res = await fetch(path, { credentials: 'include' });
+    if (!res.ok) throw await res.json().catch(()=>({error:res.statusText}));
+    return res.json();
+  },
+  async post(path, body) {
+    const res = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}), credentials:'include' });
+    if (!res.ok) throw await res.json().catch(()=>({error:res.statusText}));
+    return res.json();
+  }
+};
+
+const AppState = { authUser: null, league: 'Bronze' };
+
 const Settings = {
   load() { return Storage.get(AppStorageKeys.settings, defaultSettings()); },
   save(s) { Storage.set(AppStorageKeys.settings, s); },
@@ -108,7 +124,6 @@ const AudioTTS = {
       const v = this.voices.find(v => v.name === preferred);
       if (v) return v;
     }
-    // Prefer Spanish voices
     return this.voices.find(v => v.lang?.toLowerCase().startsWith('es')) || this.voices[0];
   },
   speak(text, lang = 'es-ES') {
@@ -347,12 +362,21 @@ function scheduleSrs(item, answeredCorrect) {
 const Profile = {
   load() { return Storage.get(AppStorageKeys.profile, defaultProfile()); },
   save(p) { Storage.set(AppStorageKeys.profile, p); },
-  addXp(amount) {
+  async addXp(amount) {
+    // Local update
     const p = this.load();
     p.xp += amount;
     p.lastActiveAt = todayIso();
     this.save(p);
     Leaderboard.upsert(p);
+    // Remote update if logged in
+    if (AppState.authUser) {
+      try {
+        const { xp, xpWeek } = await Api.post('/api/xp/add', { amount });
+        const np = this.load();
+        np.xp = xp; this.save(np);
+      } catch {}
+    }
   },
 };
 
@@ -421,6 +445,19 @@ function renderHeaderProfile() {
   document.getElementById('user-xp').textContent = `${p.xp} XP`;
   document.getElementById('xp-bar').style.width = `${Math.round(currentLevelProgress * 100)}%`;
   document.getElementById('user-streak').textContent = `🔥 ${Streak.load().current} días`;
+  // Gems and auth buttons
+  const gemsEl = document.getElementById('user-gems');
+  const btnLogin = document.getElementById('btn-login');
+  const btnProfile = document.getElementById('btn-profile');
+  if (AppState.authUser) {
+    gemsEl.textContent = AppState.authUser.gems ?? 0;
+    btnLogin.classList.add('hidden');
+    btnProfile.classList.remove('hidden');
+  } else {
+    gemsEl.textContent = '0';
+    btnLogin.classList.remove('hidden');
+    btnProfile.classList.add('hidden');
+  }
 }
 
 function renderStatsCards() {
@@ -571,159 +608,177 @@ function startLessonFlow(lessonId) {
   const unit = ContentDB.units.find(u => u.id === lessonId);
   if (!unit) return;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fixed inset-0 z-50 p-4 md:p-10';
-  overlay.innerHTML = `
-    <div class="absolute inset-0 bg-slate-950/70"></div>
-    <div class="relative max-w-3xl mx-auto">
-      <div class="rounded-2xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 p-0.5">
-        <div class="rounded-[14px] glass p-4 md:p-6">
-          <div class="flex items-center justify-between">
-            <div class="font-bold">${unit.title}</div>
-            <button id="close-lesson" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Salir</button>
-          </div>
-          <div id="lesson-step" class="mt-4"></div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  document.getElementById('close-lesson').onclick = () => overlay.remove();
-
-  let stepIndex = 0;
-  const steps = [];
-
-  unit.words.forEach(w => steps.push({ type: 'intro-word', word: w }));
-  unit.phrases.forEach(p => steps.push({ type: 'intro-phrase', phrase: p }));
-  unit.quiz.forEach(q => steps.push({ type: 'quiz', q }));
-
-  let correctCount = 0;
-
-  const renderStep = () => {
-    if (stepIndex >= steps.length) return finishLesson();
-    const step = steps[stepIndex];
-    const host = overlay.querySelector('#lesson-step');
-
-    if (step.type === 'intro-word') {
-      host.innerHTML = `
-        <div class="flex flex-col gap-2">
-          <div class="text-sm text-slate-300">Nueva palabra</div>
-          <div class="text-4xl font-black">${step.word.es}</div>
-          <div class="text-slate-400">${step.word.en}${step.word.ipa ? ` · /${step.word.ipa}/` : ''}</div>
-          <div class="flex gap-2 mt-2">
-            <button id="speak" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Escuchar</button>
-            <button id="next" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Siguiente</button>
-          </div>
-        </div>
-      `;
-      document.getElementById('speak').onclick = () => AudioTTS.speak(step.word.es);
-      document.getElementById('next').onclick = () => { stepIndex++; renderStep(); };
-    } else if (step.type === 'intro-phrase') {
-      host.innerHTML = `
-        <div class="flex flex-col gap-2">
-          <div class="text-sm text-slate-300">Nueva frase</div>
-          <div class="text-3xl font-black">${step.phrase.es}</div>
-          <div class="text-slate-400">${step.phrase.en}</div>
-          <div class="flex gap-2 mt-2">
-            <button id="speak" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Escuchar</button>
-            <button id="next" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Siguiente</button>
-          </div>
-        </div>
-      `;
-      document.getElementById('speak').onclick = () => AudioTTS.speak(step.phrase.es);
-      document.getElementById('next').onclick = () => { stepIndex++; renderStep(); };
-    } else if (step.type === 'quiz') {
-      if (step.q.type === 'mc') {
-        const opts = step.q.options.map((o, i) => `<button class="opt px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm" data-i="${i}">${o}</button>`).join(' ');
-        host.innerHTML = `
-          <div class="flex flex-col gap-3">
-            <div class="text-sm text-slate-300">Pregunta</div>
-            <div class="text-xl font-bold">${step.q.q}</div>
-            <div class="flex flex-wrap gap-2">${opts}</div>
-          </div>
-        `;
-        host.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
-          const i = Number(b.dataset.i);
-          const ok = i === step.q.a;
-          correctCount += ok ? 1 : 0;
-          Profile.addXp(ok ? 10 : 2);
-          b.classList.add(ok ? 'bg-emerald-700' : 'bg-rose-700');
-          setTimeout(() => { stepIndex++; renderStep(); }, 500);
-        }));
-      } else if (step.q.type === 'type') {
-        host.innerHTML = `
-          <div class="flex flex-col gap-3">
-            <div class="text-sm text-slate-300">Escribe tu respuesta</div>
-            <div class="text-xl font-bold">${step.q.q}</div>
-            <input id="answer" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none" placeholder="Tu respuesta" />
-            <div class="flex gap-2">
-              <button id="submit" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Enviar</button>
-              <button id="hint" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Pista</button>
-            </div>
-          </div>
-        `;
-        document.getElementById('submit').onclick = () => {
-          const val = (document.getElementById('answer').value || '').trim().toLowerCase();
-          const ok = val === step.q.a.toLowerCase();
-          correctCount += ok ? 1 : 0;
-          Profile.addXp(ok ? 12 : 2);
-          stepIndex++; renderStep();
-        };
-        document.getElementById('hint').onclick = () => alert(`Empieza con: ${step.q.a.slice(0, 2)}...`);
-      } else if (step.q.type === 'listen') {
-        const srOk = Settings.load().speechRecognition && SpeechReco.isSupported();
-        host.innerHTML = `
-          <div class="flex flex-col gap-3">
-            <div class="text-sm text-slate-300">Escucha y responde</div>
-            <div class="flex gap-2">
-              <button id="play" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Reproducir</button>
-              ${srOk ? '<button id="speak" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Hablar</button>' : ''}
-            </div>
-            <input id="answer" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none" placeholder="Escribe lo que escuchas" />
-            <button id="submit" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Comprobar</button>
-          </div>
-        `;
-        document.getElementById('play').onclick = () => AudioTTS.speak(step.q.a);
-        const submit = () => {
-          const val = (document.getElementById('answer').value || '').trim().toLowerCase();
-          const ok = similarity(val, step.q.a) >= 0.8;
-          correctCount += ok ? 1 : 0;
-          Profile.addXp(ok ? 12 : 2);
-          stepIndex++; renderStep();
-        };
-        document.getElementById('submit').onclick = submit;
-        const speakBtn = document.getElementById('speak');
-        if (speakBtn) speakBtn.onclick = async () => {
-          speakBtn.disabled = true; speakBtn.textContent = 'Escuchando…';
-          try {
-            const text = await SpeechReco.recognizeOnce({ lang: 'es-ES' });
-            document.getElementById('answer').value = text;
-          } catch {}
-          speakBtn.disabled = false; speakBtn.textContent = 'Hablar';
-        };
+  async function ensureGemAndProceed() {
+    if (!AppState.authUser) return renderOverlay();
+    try {
+      const { gems } = await Api.post('/api/lessons/start', {});
+      AppState.authUser.gems = gems; renderHeaderProfile();
+      renderOverlay();
+    } catch (e) {
+      if (e?.error === 'no_gems') {
+        if (confirm('No tienes 💎 suficientes. ¿Ver un anuncio para ganar +1?')) {
+          try { const r = await Api.post('/api/ads/reward', {}); AppState.authUser.gems = r.gems; renderHeaderProfile(); }
+          catch(err){ alert('Espera antes de ver otro anuncio.'); }
+        }
+      } else {
+        renderOverlay();
       }
     }
-  };
+  }
 
-  const finishLesson = () => {
-    const score = Math.round((correctCount / unit.quiz.length) * 100);
-    Progress.completeLesson(unit.id, score, unit.words.length);
-    Profile.addXp(30 + unit.difficulty * 10);
+  function renderOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-50 p-4 md:p-10';
+    overlay.innerHTML = `
+      <div class="absolute inset-0 bg-slate-950/70"></div>
+      <div class="relative max-w-3xl mx-auto">
+        <div class="rounded-2xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 p-0.5">
+          <div class="rounded-[14px] glass p-4 md:p-6">
+            <div class="flex items-center justify-between">
+              <div class="font-bold">${unit.title}</div>
+              <button id="close-lesson" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Salir</button>
+            </div>
+            <div id="lesson-step" class="mt-4"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('close-lesson').onclick = () => document.body.removeChild(overlay);
 
-    const srs = Srs.load();
-    unit.words.forEach(w => ensureSrsForWord(srs, w.id));
-    Srs.save(srs);
+    let stepIndex = 0;
+    const steps = [];
+    unit.words.forEach(w => steps.push({ type: 'intro-word', word: w }));
+    unit.phrases.forEach(p => steps.push({ type: 'intro-phrase', phrase: p }));
+    unit.quiz.forEach(q => steps.push({ type: 'quiz', q }));
 
-    renderHeaderProfile();
-    renderStatsCards();
-    renderLessonGrid();
-    renderFlashcardsPanel();
-    tryConfetti();
-    alert(`Lección completada: ${unit.title} — Puntuación: ${score}%`);
-    document.body.removeChild(overlay);
-  };
+    let correctCount = 0;
 
-  renderStep();
+    const renderStep = () => {
+      if (stepIndex >= steps.length) return finishLesson();
+      const step = steps[stepIndex];
+      const host = overlay.querySelector('#lesson-step');
+
+      if (step.type === 'intro-word') {
+        host.innerHTML = `
+          <div class="flex flex-col gap-2">
+            <div class="text-sm text-slate-300">Nueva palabra</div>
+            <div class="text-4xl font-black">${step.word.es}</div>
+            <div class="text-slate-400">${step.word.en}${step.word.ipa ? ` · /${step.word.ipa}/` : ''}</div>
+            <div class="flex gap-2 mt-2">
+              <button id="speak" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Escuchar</button>
+              <button id="next" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Siguiente</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('speak').onclick = () => AudioTTS.speak(step.word.es);
+        document.getElementById('next').onclick = () => { stepIndex++; renderStep(); };
+      } else if (step.type === 'intro-phrase') {
+        host.innerHTML = `
+          <div class="flex flex-col gap-2">
+            <div class="text-sm text-slate-300">Nueva frase</div>
+            <div class="text-3xl font-black">${step.phrase.es}</div>
+            <div class="text-slate-400">${step.phrase.en}</div>
+            <div class="flex gap-2 mt-2">
+              <button id="speak" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Escuchar</button>
+              <button id="next" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Siguiente</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('speak').onclick = () => AudioTTS.speak(step.phrase.es);
+        document.getElementById('next').onclick = () => { stepIndex++; renderStep(); };
+      } else if (step.type === 'quiz') {
+        if (step.q.type === 'mc') {
+          const opts = step.q.options.map((o, i) => `<button class="opt px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm" data-i="${i}">${o}</button>`).join(' ');
+          host.innerHTML = `
+            <div class="flex flex-col gap-3">
+              <div class="text-sm text-slate-300">Pregunta</div>
+              <div class="text-xl font-bold">${step.q.q}</div>
+              <div class="flex flex-wrap gap-2">${opts}</div>
+            </div>
+          `;
+          host.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
+            const i = Number(b.dataset.i);
+            const ok = i === step.q.a;
+            correctCount += ok ? 1 : 0;
+            Profile.addXp(ok ? 10 : 2);
+            b.classList.add(ok ? 'bg-emerald-700' : 'bg-rose-700');
+            setTimeout(() => { stepIndex++; renderStep(); }, 500);
+          }));
+        } else if (step.q.type === 'type') {
+          host.innerHTML = `
+            <div class="flex flex-col gap-3">
+              <div class="text-sm text-slate-300">Escribe tu respuesta</div>
+              <div class="text-xl font-bold">${step.q.q}</div>
+              <input id="answer" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none" placeholder="Tu respuesta" />
+              <div class="flex gap-2">
+                <button id="submit" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Enviar</button>
+                <button id="hint" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Pista</button>
+              </div>
+            </div>
+          `;
+          document.getElementById('submit').onclick = () => {
+            const val = (document.getElementById('answer').value || '').trim().toLowerCase();
+            const ok = val === step.q.a.toLowerCase();
+            correctCount += ok ? 1 : 0;
+            Profile.addXp(ok ? 12 : 2);
+            stepIndex++; renderStep();
+          };
+          document.getElementById('hint').onclick = () => alert(`Empieza con: ${step.q.a.slice(0, 2)}...`);
+        } else if (step.q.type === 'listen') {
+          const srOk = Settings.load().speechRecognition && SpeechReco.isSupported();
+          host.innerHTML = `
+            <div class="flex flex-col gap-3">
+              <div class="text-sm text-slate-300">Escucha y responde</div>
+              <div class="flex gap-2">
+                <button id="play" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Reproducir</button>
+                ${srOk ? '<button id="speak" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Hablar</button>' : ''}
+              </div>
+              <input id="answer" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none" placeholder="Escribe lo que escuchas" />
+              <button id="submit" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Comprobar</button>
+            </div>
+          `;
+          document.getElementById('play').onclick = () => AudioTTS.speak(step.q.a);
+          const submit = () => {
+            const val = (document.getElementById('answer').value || '').trim().toLowerCase();
+            const ok = similarity(val, step.q.a) >= 0.8;
+            correctCount += ok ? 1 : 0;
+            Profile.addXp(ok ? 12 : 2);
+            stepIndex++; renderStep();
+          };
+          document.getElementById('submit').onclick = submit;
+          const speakBtn = document.getElementById('speak');
+          if (speakBtn) speakBtn.onclick = async () => {
+            speakBtn.disabled = true; speakBtn.textContent = 'Escuchando…';
+            try {
+              const text = await SpeechReco.recognizeOnce({ lang: 'es-ES' });
+              document.getElementById('answer').value = text;
+            } catch {}
+            speakBtn.disabled = false; speakBtn.textContent = 'Hablar';
+          };
+        }
+      }
+    };
+
+    const finishLesson = async () => {
+      const score = Math.round((correctCount / unit.quiz.length) * 100);
+      Progress.completeLesson(unit.id, score, unit.words.length);
+      await Profile.addXp(30 + unit.difficulty * 10);
+      // Remote lesson complete
+      if (AppState.authUser) {
+        try { await Api.post('/api/lessons/complete', { lessonId: unit.id, score, xpGain: 30 + unit.difficulty * 10 }); } catch {}
+      }
+      // Seed SRS and refresh
+      const srs = Srs.load(); unit.words.forEach(w => ensureSrsForWord(srs, w.id)); Srs.save(srs);
+      renderHeaderProfile(); renderStatsCards(); renderLessonGrid(); renderFlashcardsPanel();
+      tryConfetti(); alert(`Lección completada: ${unit.title} — Puntuación: ${score}%`);
+      document.body.removeChild(overlay);
+    };
+
+    renderStep();
+  }
+
+  ensureGemAndProceed();
 }
 
 function renderStreakSidebar() {
@@ -785,15 +840,37 @@ function renderChallengesAndAchievements() {
 }
 
 function renderLeaderboard() {
-  const list = Leaderboard.load();
   const root = document.getElementById('leaderboard');
   const you = Profile.load().name;
-  root.innerHTML = list.slice(0, 10).map((e, i) => `
-    <li class="glass rounded-xl border border-slate-700/60 p-3 flex items-center justify-between ${e.name===you?'ring-1 ring-brand-600/50':''}">
-      <div class="flex items-center gap-2"><span class="text-slate-400 text-xs w-5">${i+1}</span><span>${e.avatar||'🙂'}</span><span class="font-semibold">${e.name}</span></div>
-      <div class="text-xs text-slate-300">${e.xp} XP</div>
-    </li>
-  `).join('') || '<li class="text-slate-500 text-sm">Aún no hay datos</li>';
+  if (AppState.authUser) {
+    Api.get(`/api/leaderboard?scope=weekly&league=${encodeURIComponent(AppState.league)}`)
+      .then(({ top }) => {
+        root.innerHTML = (top||[]).slice(0, 10).map((e, i) => `
+          <li class="glass rounded-xl border border-slate-700/60 p-3 flex items-center justify-between ${e.name===you?'ring-1 ring-brand-600/50':''}">
+            <div class="flex items-center gap-2"><span class="text-slate-400 text-xs w-5">${i+1}</span><span>${e.avatar||'🙂'}</span><span class="font-semibold">${e.name}</span></div>
+            <div class="text-xs text-slate-300">${e.xp} XP</div>
+          </li>
+        `).join('') || '<li class="text-slate-500 text-sm">Aún no hay datos</li>';
+      })
+      .catch(()=>{
+        // fallback local
+        const list = Leaderboard.load();
+        root.innerHTML = list.slice(0, 10).map((e, i) => `
+          <li class="glass rounded-xl border border-slate-700/60 p-3 flex items-center justify-between ${e.name===you?'ring-1 ring-brand-600/50':''}">
+            <div class="flex items-center gap-2"><span class="text-slate-400 text-xs w-5">${i+1}</span><span>${e.avatar||'🙂'}</span><span class="font-semibold">${e.name}</span></div>
+            <div class="text-xs text-slate-300">${e.xp} XP</div>
+          </li>
+        `).join('') || '<li class="text-slate-500 text-sm">Aún no hay datos</li>';
+      });
+  } else {
+    const list = Leaderboard.load();
+    root.innerHTML = list.slice(0, 10).map((e, i) => `
+      <li class="glass rounded-xl border border-slate-700/60 p-3 flex items-center justify-between ${e.name===you?'ring-1 ring-brand-600/50':''}">
+        <div class="flex items-center gap-2"><span class="text-slate-400 text-xs w-5">${i+1}</span><span>${e.avatar||'🙂'}</span><span class="font-semibold">${e.name}</span></div>
+        <div class="text-xs text-slate-300">${e.xp} XP</div>
+      </li>
+    `).join('') || '<li class="text-slate-500 text-sm">Inicia sesión para ver ligas</li>';
+  }
 }
 
 function renderMiniGamesPanel() {
@@ -982,6 +1059,14 @@ function attachGlobalHandlers() {
   document.getElementById('btn-profile').onclick = openProfileModal;
   const btnSettings = document.getElementById('btn-settings');
   if (btnSettings) btnSettings.onclick = openSettingsModal;
+  const btnLogin = document.getElementById('btn-login');
+  if (btnLogin) btnLogin.onclick = openAuthModal;
+  const btnAd = document.getElementById('btn-watch-ad');
+  if (btnAd) btnAd.onclick = async () => {
+    if (!AppState.authUser) return openAuthModal();
+    try { const r = await Api.post('/api/ads/reward', {}); AppState.authUser.gems = r.gems; renderHeaderProfile(); }
+    catch(e){ alert(e?.error==='cooldown'?'Espera unos segundos antes de otro anuncio.':'Límite diario alcanzado.'); }
+  };
 }
 
 function openProfileModal() {
@@ -1070,6 +1155,43 @@ function openSettingsModal() {
   body.querySelector('#test').onclick = () => AudioTTS.speak('Este es un ejemplo de voz en español.');
 }
 
+function openAuthModal() {
+  const { overlay, body } = openOverlay('Entrar / Registrarse');
+  body.innerHTML = `
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <div class="font-semibold mb-2">Entrar</div>
+        <input id="lemail" type="email" placeholder="Email" class="w-full mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700" />
+        <input id="lpass" type="password" placeholder="Contraseña" class="w-full mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700" />
+        <button id="login" class="w-full px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Entrar</button>
+      </div>
+      <div>
+        <div class="font-semibold mb-2">Registrarse</div>
+        <input id="rname" placeholder="Nombre" class="w-full mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700" />
+        <input id="remail" type="email" placeholder="Email" class="w-full mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700" />
+        <input id="rpass" type="password" placeholder="Contraseña" class="w-full mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700" />
+        <button id="register" class="w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm">Crear cuenta</button>
+      </div>
+    </div>
+  `;
+  body.querySelector('#login').onclick = async () => {
+    try {
+      const data = await Api.post('/api/auth/login', { email: body.querySelector('#lemail').value, password: body.querySelector('#lpass').value });
+      AppState.authUser = data.user; // sync local XP to server value if desired
+      const p = Profile.load(); p.xp = data.user.xp; Profile.save(p);
+      renderAll(); document.body.removeChild(overlay);
+    } catch (e) { alert('Credenciales inválidas'); }
+  };
+  body.querySelector('#register').onclick = async () => {
+    try {
+      const data = await Api.post('/api/auth/register', { name: body.querySelector('#rname').value||'Aprendiz', email: body.querySelector('#remail').value, password: body.querySelector('#rpass').value });
+      AppState.authUser = data.user;
+      const p = Profile.load(); p.xp = data.user.xp; Profile.save(p);
+      renderAll(); document.body.removeChild(overlay);
+    } catch (e) { alert(e?.error==='email_taken'?'Este email ya existe':'No se pudo registrar'); }
+  };
+}
+
 // Confetti animation
 function tryConfetti() {
   const s = Settings.load();
@@ -1112,9 +1234,11 @@ function renderAll() {
   renderMiniGamesPanel();
 }
 
-function boot() {
+async function boot() {
   document.getElementById('year').textContent = String(new Date().getFullYear());
   AudioTTS.initVoices();
+  // Try restore session
+  try { const { user } = await Api.get('/api/profile'); AppState.authUser = user; const p = Profile.load(); p.xp = user.xp; Profile.save(p); } catch {}
   Leaderboard.upsert(Profile.load());
   renderAll();
   attachGlobalHandlers();

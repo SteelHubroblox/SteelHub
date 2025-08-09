@@ -57,8 +57,13 @@
               <svg class="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 20 20"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v2a6 6 0 006 6v2H6a1 1 0 100 2h8a1 1 0 100-2h-2v-2a6 6 0 006-6V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1z"/></svg>
               <span id="user-streak" class="font-semibold">🔥 0 días</span>
             </div>
+            <div class="hidden md:flex items-center gap-2 text-slate-300 text-sm">
+              <span class="text-cyan-400">💎</span>
+              <span id="user-gems" class="font-semibold">0</span>
+            </div>
             <button id="btn-settings" class="hidden sm:block px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Ajustes</button>
-            <button id="btn-profile" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Perfil</button>
+            <button id="btn-login" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm">Entrar</button>
+            <button id="btn-profile" class="hidden px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Perfil</button>
           </div>
         </div>
       </header>
@@ -124,6 +129,7 @@
             <div class="glass rounded-2xl border border-slate-700/60 p-5">
               <h3 class="font-bold text-lg">Desafíos</h3>
               <ul id="challenges" class="mt-2 space-y-2 text-sm"></ul>
+              <button id="btn-watch-ad" class="mt-4 w-full px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold">Ver anuncio · +1 💎</button>
             </div>
 
             <div class="glass rounded-2xl border border-slate-700/60 p-5">
