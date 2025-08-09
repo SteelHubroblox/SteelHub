@@ -625,6 +625,21 @@ function spawnExplosion(x, y, owner) {
 const rings = [];
 function spawnRing(x, y, color, duration=0.2, radius=18) { rings.push({ x, y, t:0, d:duration, r:radius, color }); }
 
+function updatePlatforms(dt) {
+  for (const s of platforms) {
+    if (s.move) {
+      s.t += dt * (s.speed || 1);
+      s.x = s.baseX + Math.sin(s.t) * (s.dx || 0);
+      s.y = s.baseY + Math.cos(s.t) * (s.dy || 0);
+    }
+    if (s.crumble) {
+      if (!s.active && s.respawnTimer > 0) {
+        s.respawnTimer -= dt; if (s.respawnTimer <= 0) { s.active = true; s.timer = -1; }
+      }
+    }
+  }
+}
+
 function update(dt) {
   if (state !== 'playing' || paused) { jumpPressed = false; return; }
   simTime += dt;
