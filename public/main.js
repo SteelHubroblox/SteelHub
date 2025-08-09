@@ -254,6 +254,7 @@ let bullets = [];
 let winner = null;
 let state = 'menu'; // menu, playing, between
 let lastTime = performance.now() / 1000;
+let simTime = 0;
 
 const menu = document.getElementById('menu');
 const difficultySel = document.getElementById('difficulty');
@@ -288,64 +289,97 @@ function playerHitsHazard(p) {
   return false;
 }
 
+// Parallax background layers
+const parallaxLayers = [];
+function setupParallax() {
+  parallaxLayers.length = 0;
+  // Far layer: big soft shapes
+  parallaxLayers.push({ kind: 'hills', speed: 0.02, color: currentPalette.bgTop, seed: 1 });
+  // Mid layer: medium shapes
+  parallaxLayers.push({ kind: 'hills', speed: 0.05, color: currentPalette.platBot || '#2b3346', seed: 2 });
+  // Near layer: small dots/stars
+  parallaxLayers.push({ kind: 'dots', speed: 0.1, color: currentPalette.accent, seed: 3 });
+}
+
+function drawParallax() {
+  const w = canvas.width, h = canvas.height;
+  for (const layer of parallaxLayers) {
+    if (layer.kind === 'hills') {
+      const yBase = h * 0.8;
+      const offset = (simTime * layer.speed * 80) % w;
+      ctx.fillStyle = layer.color + '55';
+      ctx.beginPath();
+      ctx.moveTo(-offset, yBase);
+      for (let x = -offset; x <= w + 100; x += 100) {
+        const peak = yBase - 40 - 30 * Math.sin((x + layer.seed * 73) * 0.01);
+        ctx.quadraticCurveTo(x + 50, peak, x + 100, yBase);
+      }
+      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+    } else if (layer.kind === 'dots') {
+      const count = 40;
+      for (let i = 0; i < count; i++) {
+        const x = ((i * 97 + layer.seed * 131) % w + (simTime * layer.speed * 120)) % w;
+        const y = (i * 53 + layer.seed * 77) % (h * 0.6);
+        ctx.fillStyle = layer.color + '55';
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+  }
+}
+
+// Platform helpers
+function addMovingPlat(x, y, w, h, dx, dy, speed = 1) {
+  platforms.push({ x, y, w, h, move: true, baseX: x, baseY: y, dx, dy, t: Math.random()*Math.PI*2, speed, active: true });
+}
+function addCrumblePlat(x, y, w, h, delay = 0.6, respawn = 3) {
+  platforms.push({ x, y, w, h, crumble: true, delay, respawn, timer: -1, respawnTimer: 0, active: true });
+}
+
 // Arena builder with larger layouts and spike hazards
 function buildArena(idx) {
   const w = canvas.width, h = canvas.height;
   currentPalette = PALETTES[idx % PALETTES.length];
   hazards = [];
+  platforms = [];
   const groundY = h - 60;
   const step = Math.min(200, Math.max(120, (JUMP_V * JUMP_V) / (2 * G) - 10));
   const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step; const top4 = top3 - step;
   const ph = 18;
+  // Ground
+  platforms.push({ x: 0, y: groundY, w, h: 60, active: true });
   if (idx === 0) {
-    // Classic+ bigger
-    platforms = [
-      { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.12, y: top1, w: 260, h: ph },
-      { x: w * 0.62, y: top1 - 10, w: 320, h: ph },
-      { x: w * 0.10, y: top2, w: 220, h: ph },
-      { x: w * 0.55, y: top2 - 10, w: 260, h: ph },
-      { x: w * 0.32, y: top3, w: 260, h: ph },
-    ];
-    // Spikes at edges
+    platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true });
+    addMovingPlat(w * 0.62, top1 - 10, 240, ph, 120, 0, 0.8);
+    platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true });
+    addCrumblePlat(w * 0.55, top2 - 10, 220, ph, 0.6, 3);
+    platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true });
     addSpikeRow(0, groundY - 16, 120, 16);
     addSpikeRow(w - 120, groundY - 16, 120, 16);
   } else if (idx === 1) {
-    // Multi-bridge
-    platforms = [
-      { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.05, y: top1, w: w * 0.9, h: 14 },
-      { x: w * 0.18, y: top2 + 10, w: 240, h: 14 },
-      { x: w * 0.58, y: top2, w: 280, h: 14 },
-      { x: w * 0.38, y: top3 + 10, w: 220, h: 14 },
-    ];
+    platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true });
+    addMovingPlat(w * 0.18, top2 + 10, 240, 14, 140, 0, 1.2);
+    platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true });
+    addCrumblePlat(w * 0.38, top3 + 10, 220, 14, 0.5, 2.5);
     addSpikeRow(w * 0.4, groundY - 16, w * 0.2, 16);
   } else if (idx === 2) {
-    // Towers & gaps
-    platforms = [
-      { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.12, y: top1, w: 220, h: ph },
-      { x: w * 0.12, y: top2, w: 200, h: ph },
-      { x: w * 0.12, y: top3, w: 180, h: ph },
-      { x: w * 0.68, y: top1, w: 240, h: ph },
-      { x: w * 0.68, y: top2, w: 220, h: ph },
-      { x: w * 0.68, y: top3, w: 200, h: ph },
-      { x: w * 0.40, y: top2 + 10, w: 260, h: ph },
-    ];
+    platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true });
+    addMovingPlat(w * 0.12, top2, 200, ph, 0, 80, 0.9);
+    platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true });
+    platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true });
+    addCrumblePlat(w * 0.68, top2, 220, ph, 0.7, 2.8);
+    addMovingPlat(w * 0.68, top3, 200, ph, 0, 90, 1.0);
+    platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true });
     addSpikeRow(w * 0.48, groundY - 16, 100, 16);
   } else {
-    // Pyramid & central hazard
-    platforms = [
-      { x: 0, y: groundY, w, h: 60 },
-      { x: w * 0.2, y: top1 + 10, w: 200, h: ph },
-      { x: w * 0.16, y: top2 + 10, w: 260, h: ph },
-      { x: w * 0.12, y: top3 + 10, w: 320, h: ph },
-      { x: w * 0.66, y: top1, w: 240, h: ph },
-      { x: w * 0.62, y: top2, w: 300, h: ph },
-      { x: w * 0.58, y: top3, w: 360, h: ph },
-    ];
+    platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true });
+    addCrumblePlat(w * 0.16, top2 + 10, 260, ph, 0.6, 2.6);
+    platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true });
+    addMovingPlat(w * 0.66, top1, 240, ph, 140, 0, 0.8);
+    platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true });
+    addMovingPlat(w * 0.58, top3, 360, ph, 160, 0, 0.6);
     addSpikeRow(w * 0.45, groundY - 16, w * 0.1, 16);
   }
+  setupParallax();
 }
 
 function doStartMatch() {
@@ -593,7 +627,9 @@ function spawnRing(x, y, color, duration=0.2, radius=18) { rings.push({ x, y, t:
 
 function update(dt) {
   if (state !== 'playing' || paused) { jumpPressed = false; return; }
+  simTime += dt;
   shakeT = Math.max(0, shakeT - dt);
+  updatePlatforms(dt);
 
   for (let pi = 0; pi < players.length; pi++) {
     const p = players[pi];
@@ -615,54 +651,26 @@ function update(dt) {
         p.vy = -JUMP_V * (1 + p.jumpBoost);
         p.onGround = false;
         p.jumpsUsed++;
-        // jump VFX
         spawnRing(p.x + p.w/2, p.y + p.h, currentPalette.accent, 0.25, 14);
         for (let i=0;i<8;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color);
       }
 
-      // Manual reload
       if (keys.has('KeyR') && !p.reloading && p.ammoInMag < p.magSize) { p.reloading = true; p.reloadTimer = p.reloadTime; }
 
-      // Aim
+      // Aim and shooting (same as before)...
       let dirX, dirY;
       if (isMobile && (aiming || true)) { dirX = aimVec.x || p.facing; dirY = aimVec.y || 0; }
-      else {
-        const ax = mouseX - (p.x + p.w / 2);
-        const ay = mouseY - (p.y + p.h * 0.35);
-        const len = Math.hypot(ax, ay) || 1; dirX = ax / len; dirY = ay / len;
-      }
+      else { const ax = mouseX - (p.x + p.w / 2); const ay = mouseY - (p.y + p.h * 0.35); const len = Math.hypot(ax, ay) || 1; dirX = ax / len; dirY = ay / len; }
       p.facing = Math.sign(dirX) || p.facing;
 
       p.reload -= dt;
-
-      // Burst sequencing
-      if (p.burstShotsLeft > 0) {
-        p.burstTimer -= dt;
-        if (p.burstTimer <= 0 && p.ammoInMag > 0) {
-          fireShot(p, dirX, dirY);
-          p.burstShotsLeft--; p.burstTimer = p.burstInterval;
-        }
-      }
-
+      if (p.burstShotsLeft > 0) { p.burstTimer -= dt; if (p.burstTimer <= 0 && p.ammoInMag > 0) { fireShot(p, dirX, dirY); p.burstShotsLeft--; p.burstTimer = p.burstInterval; } }
       const wantShoot = (mouseDown || mobileShoot) && !p.reloading;
-      if (wantShoot && p.reload <= 0 && p.ammoInMag > 0) {
-        fireShot(p, dirX, dirY);
-        p.reload = p.fireDelay;
-        if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; }
-      } else if (wantShoot && p.ammoInMag === 0 && !p.reloading) {
-        p.reloading = true; p.reloadTimer = p.reloadTime;
-      }
+      if (wantShoot && p.reload <= 0 && p.ammoInMag > 0) { fireShot(p, dirX, dirY); p.reload = p.fireDelay; if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; } }
+      else if (wantShoot && p.ammoInMag === 0 && !p.reloading) { p.reloading = true; p.reloadTimer = p.reloadTime; }
     } else {
-      // AI pathing avoid hazards: if hazard directly ahead at feet, jump
-      const lookAhead = 40 * Math.sign(p.vx || 1);
-      const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 20, h: 10 };
-      let dangerAhead = false;
-      for (const hz of hazards) if (rectsIntersect(feetBox, hz)) { dangerAhead = true; break; }
-      if (dangerAhead && p.onGround) { p.vy = -JUMP_V * 0.95; p.onGround = false; }
-
-      // AI reload if empty
+      // AI hazard pre-check ahead handled in updateAI; reload when empty
       if (!p.reloading && p.ammoInMag === 0) { p.reloading = true; p.reloadTimer = p.reloadTime; }
-
       updateAI(p, dt);
     }
 
@@ -673,24 +681,38 @@ function update(dt) {
     p.vy += G * dt;
     p.x += p.vx * dt;
     const bboxX = { x: p.x, y: p.y, w: p.w, h: p.h };
-    for (const s of platforms) if (rectsIntersect(bboxX, s)) { if (p.vx > 0) p.x = s.x - p.w; else if (p.vx < 0) p.x = s.x + s.w; p.vx = 0; }
+    for (const s of platforms) {
+      if (s.active === false) continue;
+      if (rectsIntersect(bboxX, s)) { if (p.vx > 0) p.x = s.x - p.w; else if (p.vx < 0) p.x = s.x + s.w; p.vx = 0; }
+    }
     p.y += p.vy * dt;
     const prevOnGround = p.onGround;
     p.onGround = false;
     const bboxY = { x: p.x, y: p.y, w: p.w, h: p.h };
-    for (const s of platforms) if (rectsIntersect(bboxY, s)) { if (p.vy > 0) { p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0; } else if (p.vy < 0) { p.y = s.y + s.h; } p.vy = 0; }
+    for (const s of platforms) {
+      if (s.active === false) continue;
+      if (rectsIntersect(bboxY, s)) {
+        if (p.vy > 0) {
+          p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0;
+          if (s.crumble && s.timer < 0) { s.timer = s.delay; }
+        } else if (p.vy < 0) {
+          p.y = s.y + s.h;
+        }
+        p.vy = 0;
+      }
+    }
+    // advance crumble timers
+    for (const s of platforms) if (s.crumble && s.timer >= 0 && s.active) { s.timer -= dt; if (s.timer <= 0) { s.active = false; s.respawnTimer = s.respawn; } }
 
-    // Land VFX
     if (!prevOnGround && p.onGround) { spawnRing(p.x + p.w/2, p.y + p.h, '#ffffff', 0.2, 12); for (let i=0;i<10;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color); }
 
-    // Hazards damage
     if (playerHitsHazard(p)) { p.hp -= 40*dt; spawnParticle(p.x + p.w/2, p.y + p.h, currentPalette.spike); }
 
     p.x = clamp(p.x, 0, canvas.width - p.w);
     if (p.onGround) p.vx -= p.vx * FRICTION * dt;
   }
 
-  // Bullets
+  // Bullets update remains as earlier...
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.life -= dt; if (b.life <= 0) { bullets.splice(i, 1); continue; }
@@ -803,6 +825,7 @@ function draw() {
   const gr = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gr.addColorStop(0, gTop); gr.addColorStop(1, gBot);
   ctx.fillStyle = gr; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawParallax();
 
   let sx = 0, sy = 0; if (shakeT > 0) { sx = (Math.random()-0.5)*10*shakeT; sy=(Math.random()-0.5)*10*shakeT; ctx.save(); ctx.translate(sx, sy); }
 
