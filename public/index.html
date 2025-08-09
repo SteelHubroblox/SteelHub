@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <title>Rounds-like 2D</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -12,7 +12,7 @@
       <div id="instructions">
         Player 1: A/D move, Space jump, Left Mouse shoot. Player 2: AI
       </div>
-      <div id="hint">First to 3 rounds wins. Between rounds, pick a card to upgrade.</div>
+      <div id="hint">First to 3 (best-of-3 engagements) per round. 5 rounds per series. Between rounds, pick an upgrade.</div>
     </div>
 
     <canvas id="game"></canvas>
@@ -21,7 +21,7 @@
       <div class="menu-card">
         <div class="menu-title">Rounds-like 2D</div>
         <div class="menu-sub">Fast 2D brawler with upgrades</div>
-        <div class="menu-controls">Controls: A/D move, Space jump, LMB shoot</div>
+        <div class="menu-controls">Desktop: A/D move, Space jump, LMB shoot</div>
         <div class="menu-row">
           <label for="difficulty">Difficulty</label>
           <select id="difficulty">
@@ -39,7 +39,21 @@
         <div class="draft-title">Pick an upgrade</div>
         <div id="draftPlayerLabel" class="draft-sub"></div>
         <div id="cardGrid" class="card-grid"></div>
-        <div class="draft-hint">Click a card to select</div>
+        <div class="draft-hint">Tap a card to select</div>
+      </div>
+    </div>
+
+    <div id="mobileControls" class="hidden">
+      <div class="mc-left">
+        <button id="btnLeft" class="mc-btn">⟨</button>
+        <button id="btnRight" class="mc-btn">⟩</button>
+      </div>
+      <div class="mc-right">
+        <div id="aimStick" class="mc-stick">
+          <div id="aimKnob" class="mc-knob"></div>
+        </div>
+        <button id="btnJump" class="mc-btn mc-btn-jump">⤒</button>
+        <button id="btnShoot" class="mc-btn mc-btn-shoot">●</button>
       </div>
     </div>
 

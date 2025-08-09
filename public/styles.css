@@ -157,3 +157,31 @@ canvas {
 .menu-controls { font-size: 12px; opacity: 0.8; }
 .menu-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 10px; }
 .menu-row select { padding: 8px; border-radius: 8px; background: #0e1420; color: #fff; border: 1px solid rgba(255,255,255,0.15); }
+
+/* Mobile Controls */
+#mobileControls {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 12px;
+  pointer-events: none;
+  z-index: 14;
+}
+.mc-left, .mc-right { display: flex; gap: 10px; align-items: center; pointer-events: auto; }
+.mc-left { margin-bottom: 8px; }
+.mc-right { margin-bottom: 8px; }
+.mc-btn {
+  width: 56px; height: 56px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); color: #fff;
+  font-size: 20px; display: grid; place-items: center; cursor: pointer;
+}
+.mc-btn-jump { width: 64px; height: 64px; }
+.mc-btn-shoot { width: 64px; height: 64px; background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)); }
+.mc-stick { width: 120px; height: 120px; border-radius: 60px; border: 1px solid rgba(255,255,255,0.2); position: relative; background: rgba(255,255,255,0.04); }
+.mc-knob { width: 48px; height: 48px; border-radius: 24px; position: absolute; left: 36px; top: 36px; background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.4); }
+
+@media (max-width: 900px) {
+  #mobileControls { display: flex; }
+}

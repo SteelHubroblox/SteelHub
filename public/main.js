@@ -430,6 +430,57 @@ function updateAI(p, dt) {
   }
 }
 
+// Mobile controls
+const mobileControls = document.getElementById('mobileControls');
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+const btnJump = document.getElementById('btnJump');
+const btnShoot = document.getElementById('btnShoot');
+const aimStick = document.getElementById('aimStick');
+const aimKnob = document.getElementById('aimKnob');
+let isMobile = false;
+function checkMobile() { isMobile = window.innerWidth <= 900 || ('ontouchstart' in window); mobileControls.classList.toggle('hidden', !isMobile); }
+window.addEventListener('resize', checkMobile); checkMobile();
+
+let mobileMoveLeft = false, mobileMoveRight = false, mobileShoot = false;
+let aimVec = { x: 1, y: 0 };
+
+function bindHold(el, on, off) {
+  const start = (e) => { e.preventDefault(); on(); };
+  const end = (e) => { e.preventDefault(); off(); };
+  el.addEventListener('touchstart', start, { passive: false });
+  el.addEventListener('touchend', end, { passive: false });
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', end);
+  el.addEventListener('mouseleave', end);
+}
+
+bindHold(btnLeft, () => mobileMoveLeft = true, () => mobileMoveLeft = false);
+bindHold(btnRight, () => mobileMoveRight = true, () => mobileMoveRight = false);
+bindHold(btnShoot, () => mobileShoot = true, () => mobileShoot = false);
+btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); jumpPressed = true; });
+btnJump.addEventListener('mousedown', (e) => { e.preventDefault(); jumpPressed = true; });
+
+let aiming = false; let aimId = null;
+function stickPosToVec(clientX, clientY) {
+  const rect = aimStick.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const dx = clientX - cx; const dy = clientY - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = dx / len; const ny = dy / len;
+  aimVec.x = nx; aimVec.y = ny;
+  const radius = rect.width/2 - 24;
+  aimKnob.style.left = `${rect.width/2 - 24 + nx * radius}px`;
+  aimKnob.style.top = `${rect.height/2 - 24 + ny * radius}px`;
+}
+aimStick.addEventListener('touchstart', (e) => { aiming = true; aimId = e.changedTouches[0].identifier; stickPosToVec(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: false });
+aimStick.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === aimId) stickPosToVec(t.clientX, t.clientY); }, { passive: false });
+aimStick.addEventListener('touchend', (e) => { aiming = false; aimId = null; aimKnob.style.left = '36px'; aimKnob.style.top = '36px'; }, { passive: false });
+aimStick.addEventListener('mousedown', (e) => { aiming = true; stickPosToVec(e.clientX, e.clientY); });
+window.addEventListener('mousemove', (e) => { if (aiming) stickPosToVec(e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => { if (aiming) { aiming = false; aimKnob.style.left = '36px'; aimKnob.style.top = '36px'; } });
+
 function update(dt) {
   if (state !== 'playing') { jumpPressed = false; return; }
   shakeT = Math.max(0, shakeT - dt);
@@ -440,8 +491,10 @@ function update(dt) {
 
     if (!isAI) {
       const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
-      if (keys.has('KeyA')) p.vx -= accel * dt;
-      if (keys.has('KeyD')) p.vx += accel * dt;
+      const moveLeft = keys.has('KeyA') || mobileMoveLeft;
+      const moveRight = keys.has('KeyD') || mobileMoveRight;
+      if (moveLeft) p.vx -= accel * dt;
+      if (moveRight) p.vx += accel * dt;
       p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost), MAX_VX * (1 + p.moveBoost));
 
       if (jumpPressed && (p.onGround || p.jumpsUsed < p.maxJumps)) {
@@ -451,20 +504,23 @@ function update(dt) {
         p.jumpsUsed++;
       }
 
-      // Aim towards mouse
-      const ax = mouseX - (p.x + p.w / 2);
-      const ay = mouseY - (p.y + p.h * 0.35);
-      const len = Math.hypot(ax, ay) || 1;
-      const dirX = ax / len; const dirY = ay / len;
+      // Aim
+      let dirX, dirY;
+      if (isMobile && (aiming || true)) { dirX = aimVec.x || p.facing; dirY = aimVec.y || 0; }
+      else {
+        const ax = mouseX - (p.x + p.w / 2);
+        const ay = mouseY - (p.y + p.h * 0.35);
+        const len = Math.hypot(ax, ay) || 1; dirX = ax / len; dirY = ay / len;
+      }
       p.facing = Math.sign(dirX) || p.facing;
 
       p.reload -= dt;
-      if (mouseDown && p.reload <= 0) {
+      const wantShoot = mouseDown || mobileShoot;
+      if (wantShoot && p.reload <= 0) {
         const vx = dirX * p.bulletSpeed;
         const vy = dirY * p.bulletSpeed;
         bullets.push(new Bullet(p, p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35, vx, vy, p.bulletDmg, p.color));
         p.reload = p.fireDelay;
-        // reduce knockback to avoid unintended facing flips
         p.vx -= Math.sign(vx) * (p.knockback / 14);
         addShake(0.05);
       }
