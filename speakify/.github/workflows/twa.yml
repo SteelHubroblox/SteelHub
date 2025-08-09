@@ -2,14 +2,13 @@ name: Build TWA and Deploy Pages
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ speakify ]
 
 jobs:
   build-twa:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
-      SITE_URL: https://steelhubroblox.github.io/SteelHub
       STORE_PASS: speakifyStore123
       KEY_PASS: speakifyKey123
       KEY_ALIAS: speakify
@@ -17,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -61,49 +62,26 @@ jobs:
           cd twa/android
           ./gradlew --no-daemon assembleRelease bundleRelease
 
-      - name: Compute signing certificate SHA256
-        id: cert
+      - name: Copy APK/AAB to repo folder
         run: |
-          FINGERPRINT=$(keytool -list -v -keystore twa/android/app/upload.keystore -alias "$KEY_ALIAS" -storepass "$STORE_PASS" -keypass "$KEY_PASS" | awk '/SHA256:/ {print $2; exit}')
-          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          mkdir -p android-apk
+          cp -a twa/android/app/build/outputs/apk/release/*.apk android-apk/ || true
+          cp -a twa/android/app/build/outputs/bundle/release/*.aab android-apk/ || true
 
-      - name: Read package id
-        id: pkg
+      - name: Commit APK/AAB to new branch apk-builds
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sudo apt-get update -y && sudo apt-get install -y jq
-          PKG=$(cat twa/manifest.json | jq -r '.packageId // .applicationId // "dev.speakify.app"')
-          echo "package=$PKG" >> "$GITHUB_OUTPUT"
+          BR=apk-builds
+          git checkout -B "$BR"
+          git add android-apk/
+          git commit -m "chore(build): add latest APK/AAB [skip ci]" || echo "No changes to commit"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BR"
 
-      - name: Prepare Pages content with assetlinks.json
-        run: |
-          mkdir -p public/.well-known
-          cp -a index.html main.js manifest.webmanifest sw.js public/
-          cat > public/.well-known/assetlinks.json <<JSON
-          [
-            {
-              "relation": ["delegate_permission/common.handle_all_urls"],
-              "target": {
-                "namespace": "android_app",
-                "package_name": "${{ steps.pkg.outputs.package }}",
-                "sha256_cert_fingerprints": ["${{ steps.cert.outputs.fingerprint }}"]
-              }
-            }
-          ]
-          JSON
-
-      - name: Deploy to GitHub Pages (gh-pages branch)
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          publish_branch: gh-pages
-
-      - name: Upload artifacts (APK/AAB and keystore)
+      - name: Upload artifacts (fallback)
         uses: actions/upload-artifact@v4
         with:
           name: speakify-android-artifacts
           path: |
-            twa/android/app/build/outputs/apk/release/*.apk
-            twa/android/app/build/outputs/bundle/release/*.aab
-            twa/android/app/upload.keystore
-            twa/android/app/keystore.properties
+            android-apk/*.apk
+            android-apk/*.aab
