@@ -402,10 +402,33 @@ function setDifficulty(label) {
 setDifficulty('normal');
 difficultySel?.addEventListener('change', (e) => setDifficulty(e.target.value));
 
-// particles
+// Visual effects: muzzle flashes and bullet trails
+const muzzleFlashes = [];
+function spawnMuzzle(x, y) { muzzleFlashes.push({ x, y, t: 0 }); }
+const trails = [];
+function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
+// Explosions VFX store
+const explosions = [];
+function spawnExplosion(x, y, owner) {
+  explosions.push({ x, y, t: 0, owner });
+  for (let i = 0; i < 16; i++) spawnSpark(x, y, owner.color);
+  addShake(0.12);
+}
+// VFX rings for impacts/jumps
+const rings = [];
+function spawnRing(x, y, color, duration=0.2, radius=18) { rings.push({ x, y, t:0, d:duration, r:radius, color }); }
+
+// Enhanced particle system
 const particles = [];
 function spawnParticle(x, y, color) {
-  particles.push({ x, y, vx: randRange(-120, 120), vy: randRange(-220, -60), life: 0.6, color });
+  // Backward compatible puff
+  particles.push({ x, y, vx: randRange(-80,80), vy: randRange(-220,-60), life: 0.5, maxLife: 0.5, color, size: randRange(2,4), rot: Math.random()*Math.PI, rotV: randRange(-4,4), type: 'puff', drag: 0.98, grav: 800 });
+}
+function spawnSpark(x, y, color) {
+  particles.push({ x, y, vx: randRange(-260,260), vy: randRange(-180,60), life: 0.35, maxLife: 0.35, color, size: randRange(2,3), rot: Math.random()*Math.PI, rotV: randRange(-10,10), type: 'spark', drag: 0.96, grav: 600 });
+}
+function spawnPuff(x, y, color, count=10) {
+  for (let i=0;i<count;i++) particles.push({ x, y, vx: randRange(-120,120), vy: randRange(-260,-80), life: 0.6, maxLife: 0.6, color, size: randRange(3,6), rot: Math.random()*Math.PI, rotV: randRange(-3,3), type: 'puff', drag: 0.985, grav: 900 });
 }
 
 let shakeT = 0;
@@ -610,7 +633,7 @@ function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
 const explosions = [];
 function spawnExplosion(x, y, owner) {
   explosions.push({ x, y, t: 0, owner });
-  for (let i = 0; i < 16; i++) spawnParticle(x, y, owner.color);
+  for (let i = 0; i < 16; i++) spawnSpark(x, y, owner.color);
   addShake(0.12);
 }
 // VFX rings for impacts/jumps
@@ -778,6 +801,14 @@ function update(dt) {
   for (let i = trails.length - 1; i >= 0; i--) { trails[i].life -= dt; if (trails[i].life <= 0) trails.splice(i, 1); }
   for (let i = muzzleFlashes.length - 1; i >= 0; i--) { muzzleFlashes[i].t += dt; if (muzzleFlashes[i].t > 0.08) muzzleFlashes.splice(i, 1); }
   for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.t += dt; if (r.t > r.d) rings.splice(i, 1); }
+  // Update enhanced particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vx *= p.drag; p.vy = p.vy * p.drag + p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.rot += p.rotV * dt;
+  }
 
   const alive = players.map(p => p.hp > 0);
   if (alive.filter(Boolean).length <= 1) { const winIdx = alive[0] ? 0 : 1; endRound(winIdx); }
@@ -841,9 +872,10 @@ function drawPlayer(p) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const gTop = currentPalette.bgTop, gBot = currentPalette.bgBot;
+  // Subtle background pulse
+  const pulse = 0.02 * Math.sin(simTime * 0.7);
   const gr = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gr.addColorStop(0, gTop); gr.addColorStop(1, gBot);
+  gr.addColorStop(0, currentPalette.bgTop); gr.addColorStop(1, currentPalette.bgBot);
   ctx.fillStyle = gr; ctx.fillRect(0, 0, canvas.width, canvas.height);
   drawParallax();
 
@@ -852,6 +884,8 @@ function draw() {
   for (const s of platforms) drawPlatform(s);
   drawHazards();
 
+  // Explosions (additive)
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const e of explosions) {
     const radius = 80 + 20 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
     const alpha = Math.max(0, 1 - e.t / 0.25);
@@ -860,17 +894,36 @@ function draw() {
     grd.addColorStop(1, 'rgba(255,200,80,0)');
     ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(e.x, e.y, radius, 0, Math.PI*2); ctx.fill();
   }
+  // trails (additive glow)
+  for (const tr of trails) { ctx.globalAlpha = Math.max(0, tr.life / 0.25); const g2 = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 26); g2.addColorStop(0, tr.color); g2.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(tr.x, tr.y, 26, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+  // muzzle flashes (cone)
+  for (const m of muzzleFlashes) { const a = Math.max(0, 1 - m.t / 0.08); ctx.globalAlpha = a; ctx.fillStyle = '#ffd27d'; ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(m.x + 18, m.y - 6); ctx.lineTo(m.x + 18, m.y + 6); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.restore();
 
   for (const p of players) drawPlayer(p);
-  for (const b of bullets) { const grd2 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.8); grd2.addColorStop(0, b.color); grd2.addColorStop(1, '#ffffff00'); ctx.fillStyle = grd2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
-  for (const pr of particles) { ctx.globalAlpha = Math.max(0, pr.life / 0.6); ctx.fillStyle = pr.color; ctx.fillRect(pr.x, pr.y, 2, 2); ctx.globalAlpha = 1; }
 
-  // trails
-  for (const tr of trails) { ctx.globalAlpha = Math.max(0, tr.life / 0.25); const g2 = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 30); g2.addColorStop(0, tr.color); g2.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(tr.x, tr.y, 30, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
-  // muzzle
-  for (const m of muzzleFlashes) { const a = Math.max(0, 1 - m.t / 0.08); ctx.globalAlpha = a; ctx.fillStyle = '#ffd27d'; ctx.beginPath(); ctx.arc(m.x, m.y, 10, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+  // bullets
+  for (const b of bullets) { const grd2 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.8); grd2.addColorStop(0, b.color); grd2.addColorStop(1, '#ffffff00'); ctx.fillStyle = grd2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
+
+  // enhanced particles
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const pr of particles) {
+    const t = 1 - (pr.life / pr.maxLife);
+    if (pr.type === 'spark') {
+      ctx.translate(pr.x, pr.y); ctx.rotate(pr.rot);
+      ctx.fillStyle = pr.color; ctx.fillRect(-pr.size*0.5, -pr.size*2, pr.size, pr.size*4);
+      ctx.setTransform(1,0,0,1,0,0);
+    } else {
+      const g3 = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, pr.size * 4);
+      g3.addColorStop(0, pr.color);
+      g3.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g3; ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.size * 4, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+
   // rings
-  for (const r of rings) { const t = r.t / r.d; ctx.strokeStyle = r.color; ctx.globalAlpha = Math.max(0, 1 - t); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (1 + t*2), 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1; }
+  for (const r of rings) { const tt = r.t / r.d; ctx.strokeStyle = r.color; ctx.globalAlpha = Math.max(0, 1 - tt); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (1 + tt*2), 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1; }
 
   if (shakeT > 0) ctx.restore();
   drawVignette();
@@ -878,7 +931,6 @@ function draw() {
   // HUD (Round & Series) + Ammo
   ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui, sans-serif';
   ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI`, Math.max(12, canvas.width/2 - 180), 28);
-  // Ammo HUD bottom-left
   const p1 = players[0];
   ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui, sans-serif';
   const reloadTxt = p1.reloading ? ' (reloading...)' : '';
