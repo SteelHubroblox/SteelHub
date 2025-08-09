@@ -1177,7 +1177,7 @@ function openAuthModal() {
   body.querySelector('#login').onclick = async () => {
     try {
       const data = await Api.post('/api/auth/login', { email: body.querySelector('#lemail').value, password: body.querySelector('#lpass').value });
-      AppState.authUser = data.user; // sync local XP to server value if desired
+      AppState.authUser = data.user; AppState.league = data.user.league || 'Bronze'; // sync local XP to server value if desired
       const p = Profile.load(); p.xp = data.user.xp; Profile.save(p);
       renderAll(); document.body.removeChild(overlay);
     } catch (e) { alert('Credenciales inválidas'); }
@@ -1185,7 +1185,7 @@ function openAuthModal() {
   body.querySelector('#register').onclick = async () => {
     try {
       const data = await Api.post('/api/auth/register', { name: body.querySelector('#rname').value||'Aprendiz', email: body.querySelector('#remail').value, password: body.querySelector('#rpass').value });
-      AppState.authUser = data.user;
+      AppState.authUser = data.user; AppState.league = data.user.league || 'Bronze';
       const p = Profile.load(); p.xp = data.user.xp; Profile.save(p);
       renderAll(); document.body.removeChild(overlay);
     } catch (e) { alert(e?.error==='email_taken'?'Este email ya existe':'No se pudo registrar'); }
@@ -1238,7 +1238,7 @@ async function boot() {
   document.getElementById('year').textContent = String(new Date().getFullYear());
   AudioTTS.initVoices();
   // Try restore session
-  try { const { user } = await Api.get('/api/profile'); AppState.authUser = user; const p = Profile.load(); p.xp = user.xp; Profile.save(p); } catch {}
+  try { const { user } = await Api.get('/api/profile'); AppState.authUser = user; AppState.league = user.league || 'Bronze'; const p = Profile.load(); p.xp = user.xp; Profile.save(p); } catch {}
   Leaderboard.upsert(Profile.load());
   renderAll();
   attachGlobalHandlers();
