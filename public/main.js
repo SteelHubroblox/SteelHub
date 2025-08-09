@@ -1,4 +1,4 @@
-// Dynamic dependency loader with CDN fallbacks
+// Dynamic dependency loader with CDN fallbacks (simplified and robust)
 let THREE, PointerLockControls, Stats, GUI, Sky, Octree, Capsule;
 async function loadDeps() {
   async function tryImport(candidates) {
@@ -8,53 +8,57 @@ async function loadDeps() {
     }
     throw lastErr;
   }
-  THREE = (await tryImport([
-    'https://unpkg.com/three@0.164.1/build/three.module.js',
-    'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
-  ])).default ? (await tryImport([
-    'https://unpkg.com/three@0.164.1/build/three.module.js',
-    'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
-  ])).default : await tryImport([
+
+  // three.js namespace module
+  const threeMod = await tryImport([
     'https://unpkg.com/three@0.164.1/build/three.module.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
   ]);
-  // normalize THREE when import returns namespace
-  if (!THREE.Scene) { THREE = (await import('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js')).default || THREE; }
+  THREE = threeMod.default && threeMod.default.Scene ? threeMod.default : threeMod;
 
-  PointerLockControls = (await tryImport([
+  // examples
+  const plcMod = await tryImport([
     'https://unpkg.com/three@0.164.1/examples/jsm/controls/PointerLockControls.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/PointerLockControls.js',
-  ])).PointerLockControls;
+  ]);
+  PointerLockControls = plcMod.PointerLockControls || plcMod.default || plcMod;
 
-  Stats = (await tryImport([
+  const statsMod = await tryImport([
     'https://unpkg.com/three@0.164.1/examples/jsm/libs/stats.module.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/libs/stats.module.js',
-  ])).default;
+  ]);
+  Stats = statsMod.default || statsMod.Stats || statsMod;
 
-  // lil-gui: prefer standalone
   const guiMod = await tryImport([
     'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm',
     'https://unpkg.com/three@0.164.1/examples/jsm/libs/lil-gui.module.min.js',
   ]);
   GUI = guiMod.GUI || guiMod.default || guiMod;
 
-  Sky = (await tryImport([
+  const skyMod = await tryImport([
     'https://unpkg.com/three@0.164.1/examples/jsm/objects/Sky.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/objects/Sky.js',
-  ])).Sky;
+  ]);
+  Sky = skyMod.Sky || skyMod.default || skyMod;
 
-  Octree = (await tryImport([
+  const octreeMod = await tryImport([
     'https://unpkg.com/three@0.164.1/examples/jsm/math/Octree.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/math/Octree.js',
-  ])).Octree;
+  ]);
+  Octree = octreeMod.Octree || octreeMod.default || octreeMod;
 
-  Capsule = (await tryImport([
+  const capsuleMod = await tryImport([
     'https://unpkg.com/three@0.164.1/examples/jsm/math/Capsule.js',
     'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/math/Capsule.js',
-  ])).Capsule;
+  ]);
+  Capsule = capsuleMod.Capsule || capsuleMod.default || capsuleMod;
 }
 
-await loadDeps();
+try {
+  await loadDeps();
+} catch (e) {
+  console.error('Failed loading dependencies', e);
+}
 
 // ------------------------------------------------------------
 // Global state

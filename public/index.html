@@ -19,6 +19,12 @@
       <button id="startButton" class="primary">Enter City</button>
     </div>
 
+    <script>
+      // Fail-safe: hide overlay if module fails to load
+      window.addEventListener('error', () => {
+        const ov = document.getElementById('overlay'); if (ov) ov.classList.add('hidden');
+      }, { once: true });
+    </script>
     <script type="module" src="main.js"></script>
   </body>
 </html>
