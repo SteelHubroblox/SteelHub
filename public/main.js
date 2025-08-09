@@ -60,6 +60,23 @@ try {
   console.error('Failed loading dependencies', e);
 }
 
+// Provide safe fallbacks if optional modules failed to load
+const HasSky = typeof Sky === 'function';
+if (typeof Octree !== 'function') {
+  class DummyOctree {
+    fromGraphNode() {}
+    capsuleIntersect() { return null; }
+  }
+  Octree = DummyOctree;
+}
+if (typeof Capsule !== 'function') {
+  class DummyCapsule {
+    constructor(start, end, radius) { this.start = start; this.end = end; this.radius = radius; }
+    translate(v) { this.start.add(v); this.end.add(v); }
+  }
+  Capsule = DummyCapsule;
+}
+
 // ------------------------------------------------------------
 // Global state
 // ------------------------------------------------------------
@@ -133,78 +150,83 @@ const startButton = document.getElementById('startButton');
 init();
 
 function init() {
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
 
-  // Minimap overlay (border only; rendering uses viewport)
-  const minimapOverlay = document.createElement('div');
-  minimapOverlay.id = 'minimapOverlay';
-  document.body.appendChild(minimapOverlay);
+    const minimapOverlay = document.createElement('div');
+    minimapOverlay.id = 'minimapOverlay';
+    document.body.appendChild(minimapOverlay);
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x101216);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101216);
 
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 
-  // Controls with pointer lock
-  controls = new PointerLockControls(camera, document.body);
-  controls.pointerSpeed = 0.3;
+    controls = new PointerLockControls(camera, document.body);
+    controls.pointerSpeed = 0.3;
 
-  startButton.addEventListener('click', () => {
-    try {
-      controls.lock();
-    } catch (e) {
-      console.warn('PointerLock lock failed, starting anyway', e);
+    startButton.addEventListener('click', () => {
+      try { controls.lock(); } catch (e) { console.warn('PointerLock lock failed, starting anyway', e); }
+      overlay.classList.add('hidden');
+    });
+
+    controls.addEventListener('lock', () => { overlay.classList.add('hidden'); });
+    controls.addEventListener('unlock', () => { overlay.classList.remove('hidden'); });
+
+    stats = new (Stats || function(){ return { dom: document.createElement('div'), update(){} }; })();
+    stats.dom.id = 'stats';
+    document.body.appendChild(stats.dom);
+
+    gui = new (GUI || function(){ return { add(){return {onChange(){}, onFinishChange(){}}}, hide(){}, show(){}}; })({ title: 'City Settings' });
+    if (gui.add) {
+      gui.add(params, 'dayNightSpeed', 0.0, 0.5, 0.01);
+      gui.add(params, 'timeScale', 0.1, 2.0, 0.05);
+      gui.add(params, 'trafficDensity', 0.0, 2.0, 0.05);
+      gui.add(params, 'pedestrianDensity', 0.0, 2.0, 0.05);
+      gui.add(params, 'toggleShadows').onChange((v) => (renderer.shadowMap.enabled = v));
+      gui.add(params, 'resetPlayer');
+      gui.hide();
     }
-    overlay.classList.add('hidden');
-  });
 
-  controls.addEventListener('lock', () => {
-    overlay.classList.add('hidden');
-  });
-  controls.addEventListener('unlock', () => {
-    overlay.classList.remove('hidden');
-  });
+    setupLightsAndSky();
+    setupWorldAndCity();
+    setupPlayer();
+    setupMinimap();
+    setupInput();
 
-  // Stats
-  stats = new Stats();
-  stats.dom.id = 'stats';
-  document.body.appendChild(stats.dom);
+    // Visual sanity helper
+    const grid = new THREE.GridHelper(1000, 100, 0x222222, 0x333333);
+    grid.position.y = 0.01;
+    scene.add(grid);
 
-  // GUI
-  gui = new GUI({ title: 'City Settings' });
-  gui.add(params, 'dayNightSpeed', 0.0, 0.5, 0.01);
-  gui.add(params, 'timeScale', 0.1, 2.0, 0.05);
-  gui.add(params, 'trafficDensity', 0.0, 2.0, 0.05);
-  gui.add(params, 'pedestrianDensity', 0.0, 2.0, 0.05);
-  gui.add(params, 'toggleShadows').onChange((v) => (renderer.shadowMap.enabled = v));
-  gui.add(params, 'resetPlayer');
-  gui.hide(); // toggle with G
+    window.addEventListener('resize', onWindowResize);
 
-  setupLightsAndSky();
-  setupWorldAndCity();
-  setupPlayer();
-  setupMinimap();
-  setupInput();
-
-  window.addEventListener('resize', onWindowResize);
-
-  // Start loop
-  animate();
+    animate();
+  } catch (err) {
+    console.error('Init error', err);
+    try { const ov = document.getElementById('overlay'); if (ov) ov.classList.add('hidden'); } catch {}
+    // Keep a basic render loop so at least background is visible
+    function fallbackLoop() {
+      requestAnimationFrame(fallbackLoop);
+      if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+    fallbackLoop();
+  }
 }
 
 function setupLightsAndSky() {
-  ambientLight = new THREE.AmbientLight(0xffffff, 0.24);
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   scene.add(ambientLight);
 
-  dirLight = new THREE.DirectionalLight(0xffffff, 2.6);
+  dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
   dirLight.position.set(100, 200, 80);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.mapSize.set(1024, 1024);
   dirLight.shadow.camera.near = 0.5;
   dirLight.shadow.camera.far = 1200;
   dirLight.shadow.camera.left = -500;
@@ -213,30 +235,27 @@ function setupLightsAndSky() {
   dirLight.shadow.camera.bottom = -500;
   scene.add(dirLight);
 
-  // Sky
-  sky = new Sky();
-  sky.scale.setScalar(450000);
-  scene.add(sky);
+  if (HasSky && Sky) {
+    sky = new Sky();
+    sky.scale.setScalar(450000);
+    scene.add(sky);
 
-  sun = new THREE.Vector3();
-
-  updateSunUniforms(0.25, 0.15); // initial
+    sun = new THREE.Vector3();
+    updateSunUniforms(0.25, 0.15);
+  }
 }
 
 function updateSunUniforms(elevation01, azimuth01) {
-  // elevation 0..1 => [0, 90] deg; azimuth 0..1 => [0, 360]
+  if (!sky || !dirLight) return;
   const phi = THREE.MathUtils.degToRad(90 - elevation01 * 90);
   const theta = THREE.MathUtils.degToRad(azimuth01 * 360);
-
   sun.setFromSphericalCoords(1, phi, theta);
-
-  sky.material.uniforms['sunPosition'].value.copy(sun);
-
+  if (sky.material && sky.material.uniforms && sky.material.uniforms['sunPosition']) {
+    sky.material.uniforms['sunPosition'].value.copy(sun);
+  }
   dirLight.position.copy(sun).multiplyScalar(400);
   dirLight.intensity = THREE.MathUtils.lerp(0.3, 3.0, Math.max(0, Math.sin(elevation01 * Math.PI)));
   ambientLight.intensity = THREE.MathUtils.lerp(0.1, 0.35, Math.max(0, Math.sin(elevation01 * Math.PI)));
-
-  // Slight warm/cool shift across day
   const warm = new THREE.Color(0xfff1d6);
   const cool = new THREE.Color(0xaecbff);
   const dayMix = Math.max(0, Math.sin(elevation01 * Math.PI));
@@ -245,8 +264,6 @@ function updateSunUniforms(elevation01, azimuth01) {
 
 function setupWorldAndCity() {
   worldOctree = new Octree();
-
-  // Ground plane (base)
   const groundGeo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 1.0, metalness: 0.0 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -256,12 +273,10 @@ function setupWorldAndCity() {
   ground.userData.solid = true;
   scene.add(ground);
 
-  // City grid
   const { nodes, edges } = buildCityGrid();
   roadGraph.nodes = nodes;
   roadGraph.edges = edges;
 
-  // Add roads meshes and sidewalks and buildings
   const cityGroup = new THREE.Group();
   cityGroup.name = 'City';
   scene.add(cityGroup);
@@ -271,24 +286,13 @@ function setupWorldAndCity() {
   buildBuildings(cityGroup);
   addStreetLights(cityGroup);
 
-  // Build collision octree from solid obstacles (buildings, street light poles)
   const collisionGroup = new THREE.Group();
   collisionGroup.name = 'CollisionGroup';
+  cityGroup.traverse((obj) => { if (obj.isMesh && obj.userData.solid) collisionGroup.add(obj.clone()); });
+  const groundClone = scene.getObjectByName('Ground');
+  if (groundClone && groundClone.clone) collisionGroup.add(groundClone.clone());
+  if (worldOctree && worldOctree.fromGraphNode) worldOctree.fromGraphNode(collisionGroup);
 
-  cityGroup.traverse((obj) => {
-    if (obj.isMesh) {
-      if (obj.userData.solid) {
-        collisionGroup.add(obj.clone());
-      }
-    }
-  });
-  // include ground in collisions too
-  const groundClone = scene.getObjectByName('Ground').clone();
-  collisionGroup.add(groundClone);
-
-  worldOctree.fromGraphNode(collisionGroup);
-
-  // Spawn some vehicles and pedestrians
   spawnInitialTraffic();
   spawnInitialPedestrians();
 }
@@ -827,10 +831,9 @@ function animate() {
 }
 
 function updateNightLighting() {
+  if (!dirLight || !ambientLight) return;
   const dayMix = Math.max(0, Math.sin(params.sunElevation * Math.PI));
   const night = 1 - dayMix;
-
-  // Enable street lamps and car headlights at night
   scene.traverse((obj) => {
     if (obj.userData && obj.userData.lamp && obj.userData.lamp.isLight) {
       obj.userData.lamp.intensity = THREE.MathUtils.lerp(0.0, 1.5, night);
@@ -840,7 +843,6 @@ function updateNightLighting() {
       if (obj.userData.nightGlow.material) obj.userData.nightGlow.material.emissiveIntensity = night * 1.4;
     }
     if (obj.isSpotLight && obj.parent && obj.parent.parent && obj.parent.parent.geometry && obj.parent.parent.geometry.type === 'BoxGeometry') {
-      // rough heuristic: car headlights
       obj.intensity = THREE.MathUtils.lerp(0.0, 1.2, night);
     }
   });
