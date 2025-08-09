@@ -1,0 +1,109 @@
+name: Build TWA and Deploy Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ speakify ]
+
+jobs:
+  build-twa:
+    runs-on: ubuntu-latest
+    env:
+      SITE_URL: https://steelhubroblox.github.io/SteelHub
+      STORE_PASS: speakifyStore123
+      KEY_PASS: speakifyKey123
+      KEY_ALIAS: speakify
+      APP_NAME: Speakify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Bubblewrap
+        run: npm i -g @bubblewrap/cli
+
+      - name: Init TWA project
+        run: |
+          rm -rf twa
+          yes "" | bubblewrap init --manifest "$SITE_URL/manifest.webmanifest" --directory twa --skipSigning || true
+
+      - name: Generate upload keystore
+        run: |
+          keytool -genkeypair -v -keystore twa/android/app/upload.keystore \
+            -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 36500 \
+            -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
+            -dname "CN=$APP_NAME,O=$APP_NAME,L=City,ST=State,C=US"
+
+      - name: Create keystore.properties
+        run: |
+          cat > twa/android/app/keystore.properties <<EOF
+          storeFile=upload.keystore
+          storePassword=$STORE_PASS
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASS
+          EOF
+
+      - name: Build APK (release) and AAB (release)
+        run: |
+          cd twa/android
+          ./gradlew --no-daemon assembleRelease bundleRelease
+
+      - name: Compute signing certificate SHA256
+        id: cert
+        run: |
+          FINGERPRINT=$(keytool -list -v -keystore twa/android/app/upload.keystore -alias "$KEY_ALIAS" -storepass "$STORE_PASS" -keypass "$KEY_PASS" | awk '/SHA256:/ {print $2; exit}')
+          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
+
+      - name: Read package id
+        id: pkg
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y jq
+          PKG=$(cat twa/manifest.json | jq -r '.packageId // .applicationId // "dev.speakify.app"')
+          echo "package=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Pages content with assetlinks.json
+        run: |
+          mkdir -p public/.well-known
+          cp -a index.html main.js manifest.webmanifest sw.js public/
+          cat > public/.well-known/assetlinks.json <<JSON
+          [
+            {
+              "relation": ["delegate_permission/common.handle_all_urls"],
+              "target": {
+                "namespace": "android_app",
+                "package_name": "${{ steps.pkg.outputs.package }}",
+                "sha256_cert_fingerprints": ["${{ steps.cert.outputs.fingerprint }}"]
+              }
+            }
+          ]
+          JSON
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+
+      - name: Upload artifacts (APK/AAB and keystore)
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakify-android-artifacts
+          path: |
+            twa/android/app/build/outputs/apk/release/*.apk
+            twa/android/app/build/outputs/bundle/release/*.aab
+            twa/android/app/upload.keystore
+            twa/android/app/keystore.properties
