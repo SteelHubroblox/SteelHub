@@ -439,7 +439,10 @@ const btnShoot = document.getElementById('btnShoot');
 const aimStick = document.getElementById('aimStick');
 const aimKnob = document.getElementById('aimKnob');
 let isMobile = false;
-function checkMobile() { isMobile = window.innerWidth <= 900 || ('ontouchstart' in window); mobileControls.classList.toggle('hidden', !isMobile); }
+function checkMobile() {
+  isMobile = window.innerWidth <= 900 || ('ontouchstart' in window);
+  if (!isMobile) mobileControls.classList.add('hidden'); else mobileControls.classList.remove('hidden');
+}
 window.addEventListener('resize', checkMobile); checkMobile();
 
 let mobileMoveLeft = false, mobileMoveRight = false, mobileShoot = false;
@@ -480,6 +483,12 @@ aimStick.addEventListener('touchend', (e) => { aiming = false; aimId = null; aim
 aimStick.addEventListener('mousedown', (e) => { aiming = true; stickPosToVec(e.clientX, e.clientY); });
 window.addEventListener('mousemove', (e) => { if (aiming) stickPosToVec(e.clientX, e.clientY); });
 window.addEventListener('mouseup', () => { if (aiming) { aiming = false; aimKnob.style.left = '36px'; aimKnob.style.top = '36px'; } });
+
+// Visual effects: muzzle flashes and bullet trails
+const muzzleFlashes = [];
+function spawnMuzzle(x, y) { muzzleFlashes.push({ x, y, t: 0 }); }
+const trails = [];
+function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
 
 function update(dt) {
   if (state !== 'playing') { jumpPressed = false; return; }
@@ -523,6 +532,8 @@ function update(dt) {
         p.reload = p.fireDelay;
         p.vx -= Math.sign(vx) * (p.knockback / 14);
         addShake(0.05);
+        spawnMuzzle(p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35);
+        spawnTrail(p.x + p.w / 2 + p.facing * 12, p.y + p.h * 0.35, p.color);
       }
     } else {
       updateAI(p, dt);
@@ -598,6 +609,11 @@ function update(dt) {
     const p = particles[i]; p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 800 * dt;
   }
+
+  // Update trails
+  for (let i = trails.length - 1; i >= 0; i--) { trails[i].life -= dt; if (trails[i].life <= 0) trails.splice(i, 1); }
+  // Update muzzle flashes
+  for (let i = muzzleFlashes.length - 1; i >= 0; i--) { muzzleFlashes[i].t += dt; if (muzzleFlashes[i].t > 0.08) muzzleFlashes.splice(i, 1); }
 
   const alive = players.map(p => p.hp > 0);
   if (alive.filter(Boolean).length <= 1) {
@@ -684,6 +700,24 @@ function draw() {
   }
 
   for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / 0.6); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 2, 2); ctx.globalAlpha = 1; }
+
+  // Draw trails
+  for (const tr of trails) {
+    ctx.globalAlpha = Math.max(0, tr.life / 0.25);
+    const g = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 30);
+    g.addColorStop(0, tr.color);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tr.x, tr.y, 30, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // Draw muzzle flashes
+  for (const m of muzzleFlashes) {
+    const a = Math.max(0, 1 - m.t / 0.08);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ffd27d';
+    ctx.beginPath(); ctx.arc(m.x, m.y, 10, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   if (shakeT > 0) ctx.restore();
 
