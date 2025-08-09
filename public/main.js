@@ -125,9 +125,68 @@ const difficultySel = document.getElementById('difficulty');
 startButton.onclick = () => {
   menu.classList.add('hidden');
   overlayHideDraft();
-  startMatch();
+  doStartMatch();
 };
 function overlayHideDraft() { draftOverlay.classList.add('hidden'); }
+
+// Multiple arenas
+let currentArena = 0;
+function buildArena(idx) {
+  const w = canvas.width, h = canvas.height;
+  if (idx === 0) {
+    // Classic
+    platforms = [
+      { x: 0, y: h - 60, w, h: 60 },
+      { x: w * 0.2, y: h * 0.68, w: 220, h: 16 },
+      { x: w * 0.6, y: h * 0.56, w: 260, h: 16 },
+      { x: w * 0.15, y: h * 0.44, w: 180, h: 16 },
+      { x: w * 0.55, y: h * 0.34, w: 220, h: 16 },
+    ];
+  } else if (idx === 1) {
+    // Towers
+    const pw = 180, ph = 16;
+    platforms = [
+      { x: 0, y: h - 60, w, h: 60 },
+      { x: w * 0.18, y: h * 0.72, w: pw, h: ph },
+      { x: w * 0.18, y: h * 0.52, w: pw, h: ph },
+      { x: w * 0.18, y: h * 0.32, w: pw, h: ph },
+      { x: w * 0.64, y: h * 0.66, w: pw, h: ph },
+      { x: w * 0.64, y: h * 0.46, w: pw, h: ph },
+      { x: w * 0.64, y: h * 0.26, w: pw, h: ph },
+      { x: w * 0.40, y: h * 0.56, w: 220, h: ph },
+    ];
+  } else if (idx === 2) {
+    // Bridges
+    platforms = [
+      { x: 0, y: h - 60, w, h: 60 },
+      { x: w * 0.05, y: h * 0.58, w: w * 0.9, h: 14 },
+      { x: w * 0.2, y: h * 0.44, w: 180, h: 14 },
+      { x: w * 0.6, y: h * 0.32, w: 200, h: 14 },
+    ];
+  } else {
+    // Pyramids
+    const ph = 16;
+    platforms = [
+      { x: 0, y: h - 60, w, h: 60 },
+      { x: w * 0.2, y: h * 0.70, w: 160, h: ph },
+      { x: w * 0.17, y: h * 0.62, w: 220, h: ph },
+      { x: w * 0.14, y: h * 0.54, w: 280, h: ph },
+      { x: w * 0.66, y: h * 0.66, w: 200, h: ph },
+      { x: w * 0.62, y: h * 0.58, w: 260, h: ph },
+      { x: w * 0.58, y: h * 0.50, w: 320, h: ph },
+    ];
+  }
+}
+
+function doStartMatch() {
+  state = 'playing';
+  bullets = [];
+  particles.length = 0;
+  currentArena = (currentArena + 1) % 4; // rotate arenas each match
+  buildArena(currentArena);
+  players[0].reset(); players[1].reset();
+  players[0].applyCards(); players[1].applyCards();
+}
 
 // AI params
 const AI = { react: 0.2, aimJitter: 0.15 };
@@ -152,8 +211,8 @@ function endRound(winnerIdx) {
   scores[winnerIdx]++;
   if (scores[winnerIdx] >= ROUND_WIN) {
     state = 'menu';
-    overlay.classList.remove('hidden');
-    startButton.textContent = `P${winnerIdx + 1} wins! Enter Arena to restart`;
+    menu.classList.remove('hidden');
+    startButton.textContent = `P${winnerIdx + 1} wins! Play again`;
     scores = [0, 0];
     players.forEach(p => { p.cards = []; });
     return;
@@ -167,7 +226,7 @@ function openDraft(firstPickerIdx) {
   draftOverlay.classList.remove('hidden');
   doDraftFor(firstPickerIdx, () => doDraftFor(firstPickerIdx === 0 ? 1 : 0, () => {
     draftOverlay.classList.add('hidden');
-    startMatch();
+    doStartMatch();
   }));
 }
 
