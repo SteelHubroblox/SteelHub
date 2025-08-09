@@ -1,0 +1,97 @@
+name: Build Android APK (Cordova)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      APP_ID: dev.speakify.app
+      APP_NAME: Speakify
+      STORE_PASS: speakifyStore123
+      KEY_PASS: speakifyKey123
+      KEY_ALIAS: speakify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Cordova
+        run: npm i -g cordova@11
+
+      - name: Create Cordova project
+        run: |
+          rm -rf mobile
+          cordova create mobile "$APP_ID" "$APP_NAME"
+
+      - name: Copy web assets into Cordova www
+        run: |
+          rm -rf mobile/www/*
+          mkdir -p mobile/www
+          cp -a index.html main.js manifest.webmanifest sw.js mobile/www/
+
+      - name: Add Android platform
+        run: |
+          cd mobile
+          cordova platform add android
+
+      - name: Build unsigned release APK
+        run: |
+          cd mobile
+          cordova build android --release
+
+      - name: Generate upload keystore
+        run: |
+          keytool -genkeypair -v -keystore mobile/upload.keystore \
+            -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 36500 \
+            -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
+            -dname "CN=$APP_NAME,O=$APP_NAME,L=City,ST=State,C=US"
+
+      - name: Sign APK
+        run: |
+          UNSIGNED=$(echo mobile/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk)
+          ALIGNED=mobile/platforms/android/app/build/outputs/apk/release/app-release-aligned.apk
+          SIGNED=mobile/platforms/android/app/build/outputs/apk/release/speakify-release.apk
+          ZIPALIGN=$ANDROID_HOME/build-tools/*/zipalign
+          APKSIGNER=$ANDROID_HOME/build-tools/*/apksigner
+          $ZIPALIGN -v -p 4 "$UNSIGNED" "$ALIGNED"
+          $APKSIGNER sign --ks mobile/upload.keystore --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass pass:"$STORE_PASS" --key-pass pass:"$KEY_PASS" \
+            --out "$SIGNED" "$ALIGNED"
+          echo "SIGNED_APK=$SIGNED" >> $GITHUB_ENV
+
+      - name: Commit APK to apk-builds branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p android-apk
+          cp -a "$SIGNED_APK" android-apk/
+          BR=apk-builds
+          git checkout -B "$BR"
+          git add android-apk/
+          git commit -m "chore(build): add latest Cordova APK [skip ci]" || echo "No changes to commit"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BR"
+
+      - name: Upload APK artifact (fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakify-cordova-apk
+          path: android-apk/*.apk
