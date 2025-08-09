@@ -30,6 +30,8 @@
       .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.06) 75%); background-size: 200% 100%; animation: shimmer 2s infinite; }
       @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb" />
   </head>
   <body class="text-slate-100">
     <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none" style="z-index:9999"></canvas>
@@ -146,5 +148,10 @@
     </div>
 
     <script type="module" src="./main.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+      }
+    </script>
   </body>
 </html>
