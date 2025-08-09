@@ -1,10 +1,60 @@
-import * as THREE from 'https://unpkg.com/three@0.164.1/build/three.module.js';
-import { PointerLockControls } from 'https://unpkg.com/three@0.164.1/examples/jsm/controls/PointerLockControls.js';
-import Stats from 'https://unpkg.com/three@0.164.1/examples/jsm/libs/stats.module.js';
-import { GUI } from 'https://unpkg.com/three@0.164.1/examples/jsm/libs/lil-gui.module.min.js';
-import { Sky } from 'https://unpkg.com/three@0.164.1/examples/jsm/objects/Sky.js';
-import { Octree } from 'https://unpkg.com/three@0.164.1/examples/jsm/math/Octree.js';
-import { Capsule } from 'https://unpkg.com/three@0.164.1/examples/jsm/math/Capsule.js';
+// Dynamic dependency loader with CDN fallbacks
+let THREE, PointerLockControls, Stats, GUI, Sky, Octree, Capsule;
+async function loadDeps() {
+  async function tryImport(candidates) {
+    let lastErr;
+    for (const url of candidates) {
+      try { return await import(url); } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+  THREE = (await tryImport([
+    'https://unpkg.com/three@0.164.1/build/three.module.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
+  ])).default ? (await tryImport([
+    'https://unpkg.com/three@0.164.1/build/three.module.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
+  ])).default : await tryImport([
+    'https://unpkg.com/three@0.164.1/build/three.module.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',
+  ]);
+  // normalize THREE when import returns namespace
+  if (!THREE.Scene) { THREE = (await import('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js')).default || THREE; }
+
+  PointerLockControls = (await tryImport([
+    'https://unpkg.com/three@0.164.1/examples/jsm/controls/PointerLockControls.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/PointerLockControls.js',
+  ])).PointerLockControls;
+
+  Stats = (await tryImport([
+    'https://unpkg.com/three@0.164.1/examples/jsm/libs/stats.module.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/libs/stats.module.js',
+  ])).default;
+
+  // lil-gui: prefer standalone
+  const guiMod = await tryImport([
+    'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm',
+    'https://unpkg.com/three@0.164.1/examples/jsm/libs/lil-gui.module.min.js',
+  ]);
+  GUI = guiMod.GUI || guiMod.default || guiMod;
+
+  Sky = (await tryImport([
+    'https://unpkg.com/three@0.164.1/examples/jsm/objects/Sky.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/objects/Sky.js',
+  ])).Sky;
+
+  Octree = (await tryImport([
+    'https://unpkg.com/three@0.164.1/examples/jsm/math/Octree.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/math/Octree.js',
+  ])).Octree;
+
+  Capsule = (await tryImport([
+    'https://unpkg.com/three@0.164.1/examples/jsm/math/Capsule.js',
+    'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/math/Capsule.js',
+  ])).Capsule;
+}
+
+await loadDeps();
 
 // ------------------------------------------------------------
 // Global state
@@ -101,7 +151,12 @@ function init() {
   controls.pointerSpeed = 0.3;
 
   startButton.addEventListener('click', () => {
-    controls.lock();
+    try {
+      controls.lock();
+    } catch (e) {
+      console.warn('PointerLock lock failed, starting anyway', e);
+    }
+    overlay.classList.add('hidden');
   });
 
   controls.addEventListener('lock', () => {
