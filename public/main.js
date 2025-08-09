@@ -1,5 +1,12 @@
 // Dynamic dependency loader with CDN fallbacks (simplified and robust)
-let THREE, PointerLockControls, Stats, GUI, Sky, Octree, Capsule;
+import * as THREE from './vendor/three.module.js';
+import { PointerLockControls } from './vendor/jsm/controls/PointerLockControls.js';
+import Stats from './vendor/jsm/libs/stats.module.js';
+import { GUI } from './vendor/jsm/libs/lil-gui.module.min.js';
+import { Sky } from './vendor/jsm/objects/Sky.js';
+import { Octree } from './vendor/jsm/math/Octree.js';
+import { Capsule } from './vendor/jsm/math/Capsule.js';
+
 async function loadDeps() {
   async function tryImport(candidates) {
     let lastErr;
@@ -54,17 +61,12 @@ async function loadDeps() {
   Capsule = capsuleMod.Capsule || capsuleMod.default || capsuleMod;
 }
 
-try {
-  await loadDeps();
-  window.__depsOK = true;
-} catch (e) {
-  window.__depsOK = false;
-  console.error('Failed loading dependencies', e);
-}
+window.__depsOK = true;
 
 // Provide safe fallbacks if optional modules failed to load
 const HasSky = typeof Sky === 'function';
-if (typeof Octree !== 'function') {
+// Local vendor imports exist; no need for fallbacks now
+if (false) {
   class DummyOctree {
     fromGraphNode() {}
     capsuleIntersect() { return null; }
