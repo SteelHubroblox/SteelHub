@@ -10,15 +10,28 @@
     <div id="ui">
       <div id="title">Rounds-like 2D</div>
       <div id="instructions">
-        Player 1: A/D to move, W to jump, F to shoot. Player 2: Left/Right to move, Up to jump, / to shoot.
+        Player 1: A/D move, Space jump, Left Mouse shoot. Player 2: AI
       </div>
       <div id="hint">First to 3 rounds wins. Between rounds, pick a card to upgrade.</div>
     </div>
 
     <canvas id="game"></canvas>
 
-    <div id="overlay" class="overlay">
-      <button id="startButton" class="primary">Enter Arena</button>
+    <div id="menu" class="overlay">
+      <div class="menu-card">
+        <div class="menu-title">Rounds-like 2D</div>
+        <div class="menu-sub">Fast 2D brawler with upgrades</div>
+        <div class="menu-controls">Controls: A/D move, Space jump, LMB shoot</div>
+        <div class="menu-row">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <button id="startButton" class="primary">Play</button>
+      </div>
     </div>
 
     <div id="draftOverlay" class="overlay hidden">

@@ -28,6 +28,9 @@ const ROUND_WIN = 3;
 const keys = new Set();
 window.addEventListener('keydown', (e) => keys.add(e.code));
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+let mouseDown = false;
+window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
+window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
 
 // World platforms (side view)
 let platforms = [];
@@ -108,8 +111,8 @@ const ALL_CARDS = [
 
 // Game state
 let players = [
-  new Player(0, '#69f0ae', { left: 'KeyA', right: 'KeyD', jump: 'KeyW', fire: 'KeyF' }),
-  new Player(1, '#ff8a80', { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', fire: 'Slash' }),
+  new Player(0, '#69f0ae', { left: 'KeyA', right: 'KeyD', jump: 'Space', fire: 'MouseLeft' }),
+  new Player(1, '#ff8a80', { ai: true }),
 ];
 let bullets = [];
 let winner = null;
@@ -117,18 +120,33 @@ let scores = [0, 0];
 let state = 'menu'; // menu, playing, between
 let lastTime = performance.now() / 1000;
 
+const menu = document.getElementById('menu');
+const difficultySel = document.getElementById('difficulty');
 startButton.onclick = () => {
-  overlay.classList.add('hidden');
+  menu.classList.add('hidden');
+  overlayHideDraft();
   startMatch();
 };
+function overlayHideDraft() { draftOverlay.classList.add('hidden'); }
 
-function startMatch() {
-  state = 'playing';
-  bullets = [];
-  makeDefaultPlatforms();
-  players[0].reset(); players[1].reset();
-  players[0].applyCards(); players[1].applyCards();
+// AI params
+const AI = { react: 0.2, aimJitter: 0.15 };
+function setDifficulty(label) {
+  if (label === 'easy') { AI.react = 0.35; AI.aimJitter = 0.3; }
+  else if (label === 'hard') { AI.react = 0.12; AI.aimJitter = 0.06; }
+  else { AI.react = 0.2; AI.aimJitter = 0.15; }
 }
+setDifficulty('normal');
+difficultySel?.addEventListener('change', (e) => setDifficulty(e.target.value));
+
+// particles
+const particles = [];
+function spawnParticle(x, y, color) {
+  particles.push({ x, y, vx: randRange(-120, 120), vy: randRange(-220, -60), life: 0.6, color });
+}
+
+let shakeT = 0;
+function addShake(s) { shakeT = Math.min(0.3, shakeT + s); }
 
 function endRound(winnerIdx) {
   scores[winnerIdx]++;
@@ -177,32 +195,63 @@ function pickNCards(pool, n) {
 function update(dt) {
   if (state !== 'playing') return;
 
-  for (const p of players) {
-    const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
-    if (keys.has(p.controls.left)) p.vx -= accel * dt;
-    if (keys.has(p.controls.right)) p.vx += accel * dt;
-    p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost), MAX_VX * (1 + p.moveBoost));
+  // screen shake decay
+  shakeT = Math.max(0, shakeT - dt);
 
-    if (keys.has(p.controls.jump) && p.onGround) {
-      p.vy = -JUMP_V * (1 + p.jumpBoost);
-      p.onGround = false;
-    }
+  for (let pi = 0; pi < players.length; pi++) {
+    const p = players[pi];
+    const isAI = !!p.controls.ai;
 
-    // shooting
-    p.reload -= dt;
-    if (keys.has(p.controls.fire) && p.reload <= 0) {
-      const dir = p.facing;
-      bullets.push(new Bullet(p, p.x + p.w / 2 + dir * 28, p.y + p.h * 0.35, dir * p.bulletSpeed, randRange(-60, 60), p.bulletDmg, p.color));
-      p.reload = p.fireDelay;
-      p.vx -= dir * (p.knockback / 10);
+    if (!isAI) {
+      const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
+      if (keys.has('KeyA')) p.vx -= accel * dt;
+      if (keys.has('KeyD')) p.vx += accel * dt;
+      p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost), MAX_VX * (1 + p.moveBoost));
+
+      if ((keys.has('Space')) && p.onGround) {
+        p.vy = -JUMP_V * (1 + p.jumpBoost);
+        p.onGround = false;
+      }
+
+      // P1 fire with mouse
+      p.reload -= dt;
+      if (mouseDown && p.reload <= 0) {
+        const dir = p.facing;
+        bullets.push(new Bullet(p, p.x + p.w / 2 + dir * 28, p.y + p.h * 0.35, dir * p.bulletSpeed, randRange(-60, 60), p.bulletDmg, p.color));
+        p.reload = p.fireDelay;
+        p.vx -= dir * (p.knockback / 10);
+        addShake(0.05);
+      }
+    } else {
+      // simple AI: chase horizontally, jump if obstacle, shoot when lined up
+      const enemy = players[0];
+      const dx = (enemy.x + enemy.w / 2) - (p.x + p.w / 2);
+      const wantDir = Math.sign(dx) || 1;
+      const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * (0.9 + (AI.react * 0.2));
+      p.vx += wantDir * accel * dt;
+      p.vx = clamp(p.vx, -MAX_VX * 0.9, MAX_VX * 0.9);
+      p.facing = wantDir;
+      // jump if enemy above or if colliding ahead soon
+      if (p.onGround && (enemy.y + enemy.h < p.y - 10 || Math.abs(dx) < 40)) {
+        p.vy = -JUMP_V * (0.9 + (1 - AI.react) * 0.2);
+        p.onGround = false;
+      }
+      // fire when roughly aligned horizontally
+      p.reload -= dt;
+      const verticalAlign = Math.abs((enemy.y + enemy.h * 0.4) - (p.y + p.h * 0.35)) < 80;
+      if (verticalAlign && Math.abs(dx) < canvas.width * 0.6 && p.reload <= 0) {
+        const spread = randRange(-60 - AI.aimJitter * 60, 60 + AI.aimJitter * 60);
+        bullets.push(new Bullet(p, p.x + p.w / 2 + p.facing * 28, p.y + p.h * 0.35, p.facing * p.bulletSpeed, spread, p.bulletDmg, p.color));
+        p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
+        addShake(0.05);
+      }
     }
 
     // gravity
     p.vy += G * dt;
 
-    // integrate
+    // integrate + collisions
     p.x += p.vx * dt;
-    // x collisions
     const bboxX = { x: p.x, y: p.y, w: p.w, h: p.h };
     for (const s of platforms) if (rectsIntersect(bboxX, s)) {
       if (p.vx > 0) p.x = s.x - p.w; else if (p.vx < 0) p.x = s.x + s.w;
@@ -217,37 +266,38 @@ function update(dt) {
       p.vy = 0;
     }
 
-    // friction
     if (p.onGround) p.vx -= p.vx * FRICTION * dt;
-
-    // facing
     if (Math.abs(p.vx) > 1) p.facing = Math.sign(p.vx);
   }
 
-  // bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.life -= dt; if (b.life <= 0) { bullets.splice(i, 1); continue; }
     b.x += b.vx * dt; b.y += b.vy * dt;
     b.vy += (G * 0.2) * dt;
-    // collide with platforms
     const bb = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
     let hitGeom = false;
     for (const s of platforms) if (rectsIntersect(bb, s)) { hitGeom = true; break; }
     if (hitGeom) { bullets.splice(i, 1); continue; }
-    // collide with players
     for (const p of players) {
       if (p === b.owner) continue;
       if (rectsIntersect(bb, { x: p.x, y: p.y, w: p.w, h: p.h })) {
         p.hp -= b.dmg;
         p.vx += Math.sign(b.vx) * 80; p.vy -= 120;
+        spawnParticle(b.x, b.y, b.color);
+        addShake(0.07);
         bullets.splice(i, 1);
         break;
       }
     }
   }
 
-  // round end
+  // particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 800 * dt;
+  }
+
   let alive = players.map(p => p.hp > 0);
   if (alive.filter(Boolean).length <= 1) {
     const winIdx = alive[0] ? 0 : 1;
@@ -255,40 +305,71 @@ function update(dt) {
   }
 }
 
+function drawRoundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 function draw() {
   // bg
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const gTop = '#0f172a', gBot = '#1f2b49';
+  const gTop = '#0b1020', gBot = '#141f3b';
   const gr = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gr.addColorStop(0, gTop); gr.addColorStop(1, gBot);
   ctx.fillStyle = gr; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // screen shake offset
+  let sx = 0, sy = 0;
+  if (shakeT > 0) { sx = (Math.random() - 0.5) * 10 * shakeT; sy = (Math.random() - 0.5) * 10 * shakeT; ctx.save(); ctx.translate(sx, sy); }
+
   // platforms
-  ctx.fillStyle = '#2d3748';
-  for (const s of platforms) ctx.fillRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h));
+  ctx.fillStyle = '#2b3346';
+  for (const s of platforms) {
+    drawRoundedRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h), 8);
+    ctx.fill();
+  }
 
   // players
   for (const p of players) {
     // hp bar
-    ctx.fillStyle = '#00000088'; ctx.fillRect(p.x - 2, p.y - 12, p.w + 4, 6);
-    ctx.fillStyle = p.color; ctx.fillRect(p.x - 2, p.y - 12, (p.w + 4) * clamp(p.hp / 100, 0, 1), 6);
+    ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 12, p.w + 4, 6, 3); ctx.fill();
+    ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 12, (p.w + 4) * clamp(p.hp / 100, 0, 1), 6, 3); ctx.fill();
     // body
-    ctx.fillStyle = p.color; ctx.fillRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h);
+    ctx.fillStyle = p.color; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 8); ctx.fill();
     // gun
     ctx.fillStyle = '#ddd';
     const gx = p.x + p.w / 2 + p.facing * 12; const gy = p.y + p.h * 0.35;
-    ctx.fillRect(gx, gy, p.facing * 18, 4);
+    drawRoundedRect(gx, gy, p.facing * 18, 4, 2); ctx.fill();
   }
 
   // bullets
   for (const b of bullets) {
-    ctx.fillStyle = b.color;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    const grd = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 1.8);
+    grd.addColorStop(0, b.color); grd.addColorStop(1, '#ffffff00');
+    ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
   }
+
+  // particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / 0.6);
+    ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 2, 2);
+    ctx.globalAlpha = 1;
+  }
+
+  if (shakeT > 0) ctx.restore();
 
   // score
   ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui, sans-serif';
-  ctx.fillText(`P1 ${scores[0]} - ${scores[1]} P2`, canvas.width / 2 - 40, 28);
+  ctx.fillText(`P1 ${scores[0]} - ${scores[1]} AI`, canvas.width / 2 - 48, 28);
 }
 
 function loop() {

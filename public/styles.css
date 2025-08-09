@@ -141,3 +141,19 @@ canvas {
 .card-title { font-weight: 700; margin-bottom: 6px; }
 .card-desc { font-size: 12px; opacity: 0.85; }
 .hidden { display: none; }
+
+.menu-card {
+  width: min(520px, 92vw);
+  padding: 18px;
+  background: rgba(20, 22, 28, 0.92);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  color: #fff;
+  display: grid;
+  gap: 10px;
+}
+.menu-title { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; }
+.menu-sub { opacity: 0.85; }
+.menu-controls { font-size: 12px; opacity: 0.8; }
+.menu-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 10px; }
+.menu-row select { padding: 8px; border-radius: 8px; background: #0e1420; color: #fff; border: 1px solid rgba(255,255,255,0.15); }
