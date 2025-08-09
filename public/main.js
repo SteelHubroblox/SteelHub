@@ -457,51 +457,64 @@ function updateAI(p, dt) {
   p.vx += wantDir * accel * dt;
   p.vx = clamp(p.vx, -MAX_VX * 0.85, MAX_VX * 0.85);
 
-  // Choose an upper platform toward enemy and jump when roughly aligned
+  // Choose an upper platform toward enemy and jump only when roughly aligned
   const upperPlatforms = platforms.filter(s => s.y + 1 < p.y && s.h < 40);
   let targetPlat = null; let bestDY = Infinity;
   for (const s of upperPlatforms) {
     const cx = s.x + s.w / 2; const dy = p.y - s.y;
-    if (Math.abs((p.x + p.w / 2) - cx) < 160 && dy < bestDY) { bestDY = dy; targetPlat = s; }
+    if (Math.abs((p.x + p.w / 2) - cx) < 140 && dy < bestDY) { bestDY = dy; targetPlat = s; }
   }
-  const enemyAbove = (enemy.y + enemy.h) < (p.y - 24);
-  if (p.onGround && p.aiJumpCd === 0 && (enemyAbove || targetPlat) ) {
-    const closeToPlat = targetPlat ? Math.abs((p.x + p.w/2) - (targetPlat.x + targetPlat.w/2)) < 140 : true;
-    if (closeToPlat) {
-      p.vy = -JUMP_V * (0.98);
-      p.onGround = false;
-      p.aiJumpCd = 0.5;
-    }
+  const closeToPlat = targetPlat ? Math.abs((p.x + p.w/2) - (targetPlat.x + targetPlat.w/2)) < 120 : false;
+
+  // Detect incoming bullets to dodge occasionally
+  let shouldDodge = false;
+  for (const b of bullets) {
+    if (b.owner === enemy) continue; // only dodge player bullets
+    const vx = b.vx, vy = b.vy;
+    const toAIx = (p.x + p.w/2) - b.x; const toAIy = (p.y + p.h*0.5) - b.y;
+    const dist = Math.hypot(toAIx, toAIy) || 1;
+    const tti = dist / (Math.hypot(vx, vy) || 1);
+    // If bullet heading towards AI and impact soon
+    const dot = (vx * toAIx + vy * toAIy) / ((Math.hypot(vx, vy)||1) * dist);
+    if (dot > 0.8 && tti < 0.35) { shouldDodge = Math.random() < 0.5; break; }
   }
 
-  // Predictive aim and fire towards enemy with jitter and bullet drop compensation
+  // Hazard ahead check (feet area)
+  const lookAhead = 40 * Math.sign(p.vx || 1);
+  const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 20, h: 10 };
+  let dangerAhead = false; for (const hz of hazards) if (rectsIntersect(feetBox, hz)) { dangerAhead = true; break; }
+
+  if (p.onGround && p.aiJumpCd === 0 && (dangerAhead || closeToPlat || shouldDodge)) {
+    p.vy = -JUMP_V * 0.98;
+    p.onGround = false;
+    p.aiJumpCd = 0.7;
+  }
+
+  // Predictive aim with drop compensation
   const gunX = p.x + p.w / 2 + p.facing * 12;
   const gunY = p.y + p.h * 0.35;
   const ex = enemy.x + enemy.w / 2;
   const ey = enemy.y + enemy.h * 0.4;
   const relX = ex - gunX;
   const relY = ey - gunY;
-  const dist = Math.hypot(relX, relY) || 1;
-  let t = clamp(dist / p.bulletSpeed, 0.05, 0.8);
-  // one-iter lead using enemy velocity
-  const gEff = G * 0.2; // bullet gravity factor
+  const distA = Math.hypot(relX, relY) || 1;
+  let t = clamp(distA / p.bulletSpeed, 0.05, 0.8);
+  const gEff = G * 0.2;
   const leadX = ex + enemy.vx * t;
-  const leadY = ey + enemy.vy * t - 0.5 * gEff * t * t; // aim slightly above to compensate drop
+  const leadY = ey + enemy.vy * t - 0.5 * gEff * t * t;
   let aimX = leadX - gunX;
   let aimY = leadY - gunY;
-  const n = Math.hypot(aimX, aimY) || 1;
-  aimX /= n; aimY /= n;
-  // jitter for human-like aim
-  aimX += randRange(-AI.aimJitter, AI.aimJitter);
-  aimY += randRange(-AI.aimJitter, AI.aimJitter);
+  const n = Math.hypot(aimX, aimY) || 1; aimX/=n; aimY/=n;
+  aimX += randRange(-AI.aimJitter, AI.aimJitter); aimY += randRange(-AI.aimJitter, AI.aimJitter);
   const n2 = Math.hypot(aimX, aimY) || 1; aimX/=n2; aimY/=n2;
   p.facing = Math.sign(aimX) || 1;
 
   p.reload -= dt;
-  if (p.reload <= 0 && Math.abs(dx) < canvas.width * 0.7) {
+  if (p.reload <= 0 && Math.abs(dx) < canvas.width * 0.7 && !p.reloading && p.ammoInMag > 0) {
     const vx = aimX * p.bulletSpeed;
     const vy = aimY * p.bulletSpeed;
     bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
+    p.ammoInMag--;
     p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
     addShake(0.05);
   }
