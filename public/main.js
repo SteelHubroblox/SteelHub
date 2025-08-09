@@ -5,6 +5,10 @@ const startButton = document.getElementById('startButton');
 const draftOverlay = document.getElementById('draftOverlay');
 const draftPlayerLabel = document.getElementById('draftPlayerLabel');
 const cardGrid = document.getElementById('cardGrid');
+const pauseOverlay = document.getElementById('pauseOverlay');
+const btnResume = document.getElementById('btnResume');
+const btnQuit = document.getElementById('btnQuit');
+let paused = false;
 
 // Resize
 function fit() {
@@ -491,7 +495,7 @@ const trails = [];
 function spawnTrail(x, y, color) { trails.push({ x, y, life: 0.25, color }); }
 
 function update(dt) {
-  if (state !== 'playing') { jumpPressed = false; return; }
+  if (state !== 'playing' || paused) { jumpPressed = false; return; }
   shakeT = Math.max(0, shakeT - dt);
 
   for (let pi = 0; pi < players.length; pi++) {
@@ -723,11 +727,10 @@ function draw() {
 
   drawVignette();
 
-  // HUD
+  // HUD (without engagement text)
   ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui, sans-serif';
-  const need = Math.ceil(ROUND_BEST_OF / 2);
-  ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI  |  Engagement: P1 ${roundWins[0]}/${need} - ${roundWins[1]}/${need}`,
-    Math.max(12, canvas.width/2 - 240), 28);
+  ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI`,
+    Math.max(12, canvas.width/2 - 180), 28);
 }
 
 function loop() {
@@ -769,3 +772,16 @@ function drawVignette() {
   vg.addColorStop(1, 'rgba(0,0,0,0.35)');
   ctx.fillStyle = vg; ctx.fillRect(0,0,canvas.width,canvas.height);
 }
+
+function setPaused(v) {
+  paused = v;
+  pauseOverlay.classList.toggle('hidden', !paused);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') {
+    if (state === 'playing') setPaused(!paused);
+  }
+});
+btnResume?.addEventListener('click', () => setPaused(false));
+btnQuit?.addEventListener('click', () => { setPaused(false); state = 'menu'; menu.classList.remove('hidden'); });

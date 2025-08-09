@@ -157,6 +157,8 @@ canvas {
 .menu-controls { font-size: 12px; opacity: 0.8; }
 .menu-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 10px; }
 .menu-row select { padding: 8px; border-radius: 8px; background: #0e1420; color: #fff; border: 1px solid rgba(255,255,255,0.15); }
+.accent-title { color: #ffd54f; text-shadow: 0 2px 12px rgba(255,213,79,0.25); }
+.menu-row button.primary { margin-right: 8px; }
 
 /* Mobile Controls */
 #mobileControls {

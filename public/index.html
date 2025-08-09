@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>Rounds-like 2D</title>
+    <title>Light ’em up!</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="ui">
-      <div id="title">Rounds-like 2D</div>
+      <div id="title" class="accent-title">Light ’em up!</div>
       <div id="instructions">
         Player 1: A/D move, Space jump, Left Mouse shoot. Player 2: AI
       </div>
@@ -19,7 +19,7 @@
 
     <div id="menu" class="overlay">
       <div class="menu-card">
-        <div class="menu-title">Rounds-like 2D</div>
+        <div class="menu-title accent-title">Light ’em up!</div>
         <div class="menu-sub">Fast 2D brawler with upgrades</div>
         <div class="menu-controls">Desktop: A/D move, Space jump, LMB shoot</div>
         <div class="menu-row">
@@ -31,6 +31,16 @@
           </select>
         </div>
         <button id="startButton" class="primary">Play</button>
+      </div>
+    </div>
+
+    <div id="pauseOverlay" class="overlay hidden">
+      <div class="menu-card">
+        <div class="menu-title accent-title">Paused</div>
+        <div class="menu-row">
+          <button id="btnResume" class="primary">Resume</button>
+          <button id="btnQuit" class="primary">Quit to Menu</button>
+        </div>
       </div>
     </div>
 
