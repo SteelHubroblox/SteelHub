@@ -91,8 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
       currentUser = JSON.parse(savedUser);
     }
     
-    // Always show main menu (no authentication required)
-    showMainMenu();
+    // Main menu will be shown after data loads
   }
 
   // Save data to localStorage
@@ -2100,6 +2099,9 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
 
   // Call loadData to initialize the game
   loadData();
+  
+  // Show the main menu initially
+  showMainMenu();
   
   // Start the game loop
   loop();
