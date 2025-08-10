@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare Tunnel for Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/workspace
+ExecStart=/workspace/cloudflared tunnel --url http://localhost:3001
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

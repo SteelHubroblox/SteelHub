@@ -617,6 +617,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Show online indicator
     showOnlineIndicator();
+    
+    // Set online mode flag
+    isOnline = true;
   }
   
   function showOnlineIndicator() {
@@ -1221,6 +1224,11 @@ const ALL_CARDS = [
     currentArena = (currentArena + 1) % 4; // rotate arenas each engagement
     players[0].reset(); players[1].reset();
     players[0].applyCards(); players[1].applyCards();
+    
+    // If this is an online game, ensure the online indicator is shown
+    if (isOnline) {
+      showOnlineIndicator();
+    }
   }
 
   // AI params
@@ -1646,7 +1654,7 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
       // Reload handling
       if (p.reloading) { p.reloadTimer -= dt; if (p.reloadTimer <= 0) { p.reloading = false; p.ammoInMag = p.magSize; } }
 
-      if (!isAI) {
+      if (!isAI && !p.controls.online) {
         const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
         const moveLeft = keys.has('KeyA') || mobileMoveLeft;
         const moveRight = keys.has('KeyD') || mobileMoveRight;
@@ -1688,8 +1696,12 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
           if (p.burstCount > 1) { p.burstShotsLeft = p.burstCount - 1; p.burstTimer = p.burstInterval; }
         } else if (wantShoot && p.ammoInMag === 0 && !p.reloading) { p.reloading = true; p.reloadTimer = p.reloadTime; }
         mobileShootTap = null; // consume tap
+      } else if (p.controls.online) {
+        // Online player - do nothing (waiting for real player input)
+        // Just handle reloading when empty
+        if (!p.reloading && p.ammoInMag === 0) { p.reloading = true; p.reloadTimer = p.reloadTime; }
       } else {
-        // AI hazard pre-check ahead handled in updateAI; reload when empty
+        // AI player
         if (!p.reloading && p.ammoInMag === 0) { p.reloading = true; p.reloadTimer = p.reloadTime; }
         updateAI(p, dt);
       }
@@ -1907,7 +1919,8 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
 
     // HUD (Round & Series) + Ammo
     ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui, sans-serif';
-    ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} AI`, Math.max(12, canvas.width/2 - 180), 28);
+    const opponentName = isOnline ? players[1].username || 'OnlinePlayer' : 'AI';
+    ctx.fillText(`Round ${seriesRoundIndex}/${SERIES_ROUNDS_TOTAL}  |  Series: P1 ${scores[0]} - ${scores[1]} ${opponentName}`, Math.max(12, canvas.width/2 - 180), 28);
     const p1 = players[0];
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui, sans-serif';
     const reloadTxt = p1.reloading ? ' (reloading...)' : '';
