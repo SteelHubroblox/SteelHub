@@ -3,12 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>Light ’em up!</title>
+    <title>Light 'em up!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="ui">
-      <div id="title" class="accent-title">Light ’em up!</div>
+      <div id="title" class="accent-title">Light 'em up!</div>
       <div id="instructions">
         Player 1: A/D move, Space jump, Left Mouse shoot. Player 2: AI
       </div>
@@ -17,11 +20,61 @@
 
     <canvas id="game"></canvas>
 
-    <div id="menu" class="overlay">
+    <!-- Main Menu -->
+    <div id="mainMenu" class="overlay">
+      <div class="main-menu-container">
+        <div class="game-logo">
+          <div class="logo-title">Light 'em up!</div>
+          <div class="logo-subtitle">Fast 2D brawler with upgrades</div>
+        </div>
+        
+        <div class="menu-buttons">
+          <button id="playButton" class="play-button">
+            <span class="play-icon">▶</span>
+            <span class="play-text">PLAY</span>
+          </button>
+        </div>
+
+        <div class="menu-options hidden" id="gameModeOptions">
+          <div class="mode-option" id="vsAI">
+            <div class="mode-icon">🤖</div>
+            <div class="mode-text">
+              <div class="mode-title">VS AI</div>
+              <div class="mode-desc">Practice against computer opponents</div>
+            </div>
+          </div>
+          
+          <div class="mode-option" id="online">
+            <div class="mode-icon">🌐</div>
+            <div class="mode-text">
+              <div class="mode-title">ONLINE</div>
+              <div class="mode-desc">Compete against players worldwide</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-footer">
+          <div class="rank-display" id="rankDisplay">
+            <div class="rank-icon">🥉</div>
+            <div class="rank-info">
+              <div class="rank-name">Bronze 1</div>
+              <div class="rank-division">Division 1</div>
+            </div>
+          </div>
+          
+          <button id="leaderboardButton" class="leaderboard-btn">
+            <span class="leaderboard-icon">🏆</span>
+            <span>Leaderboard</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Settings Menu (for VS AI) -->
+    <div id="gameSettings" class="overlay hidden">
       <div class="menu-card">
-        <div class="menu-title accent-title">Light ’em up!</div>
-        <div class="menu-sub">Fast 2D brawler with upgrades</div>
-        <div class="menu-controls">Desktop: A/D move, Space jump, LMB shoot</div>
+        <div class="menu-title accent-title">Game Settings</div>
+        <div class="menu-sub">Customize your AI battle</div>
         <div class="menu-row">
           <label for="difficulty">Difficulty</label>
           <select id="difficulty">
@@ -30,10 +83,14 @@
             <option value="hard">Hard</option>
           </select>
         </div>
-        <button id="startButton" class="primary">Play</button>
+        <div class="menu-row">
+          <button id="btnBackToMain" class="secondary">Back</button>
+          <button id="startButton" class="primary">Start Game</button>
+        </div>
       </div>
     </div>
 
+    <!-- Pause Overlay -->
     <div id="pauseOverlay" class="overlay hidden">
       <div class="menu-card">
         <div class="menu-title accent-title">Paused</div>
@@ -44,6 +101,7 @@
       </div>
     </div>
 
+    <!-- Draft Overlay -->
     <div id="draftOverlay" class="overlay hidden">
       <div class="draft">
         <div class="draft-title">Pick an upgrade</div>
@@ -53,6 +111,29 @@
       </div>
     </div>
 
+    <!-- Leaderboard Overlay -->
+    <div id="leaderboardOverlay" class="overlay hidden">
+      <div class="leaderboard-container">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title">🏆 Global Leaderboard</div>
+          <button id="closeLeaderboard" class="close-btn">×</button>
+        </div>
+        <div class="leaderboard-tabs">
+          <button class="tab-btn active" data-tab="global">Global</button>
+          <button class="tab-btn" data-tab="rankings">Rankings</button>
+        </div>
+        <div class="leaderboard-content">
+          <div id="globalLeaderboard" class="tab-content active">
+            <div class="leaderboard-list" id="globalList"></div>
+          </div>
+          <div id="rankingsLeaderboard" class="tab-content">
+            <div class="rankings-grid" id="rankingsGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Controls -->
     <div id="mobileControls" class="hidden">
       <div class="mc-left">
         <div id="moveStick" class="mc-stick">

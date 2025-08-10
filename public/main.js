@@ -1,6 +1,14 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
+
+// DOM Elements
+const mainMenu = document.getElementById('mainMenu');
+const gameSettings = document.getElementById('gameSettings');
+const playButton = document.getElementById('playButton');
+const gameModeOptions = document.getElementById('gameModeOptions');
+const vsAIButton = document.getElementById('vsAI');
+const onlineButton = document.getElementById('online');
+const btnBackToMain = document.getElementById('btnBackToMain');
 const startButton = document.getElementById('startButton');
 const draftOverlay = document.getElementById('draftOverlay');
 const draftPlayerLabel = document.getElementById('draftPlayerLabel');
@@ -8,7 +16,265 @@ const cardGrid = document.getElementById('cardGrid');
 const pauseOverlay = document.getElementById('pauseOverlay');
 const btnResume = document.getElementById('btnResume');
 const btnQuit = document.getElementById('btnQuit');
+const leaderboardOverlay = document.getElementById('leaderboardOverlay');
+const leaderboardButton = document.getElementById('leaderboardButton');
+const closeLeaderboard = document.getElementById('closeLeaderboard');
+const rankDisplay = document.getElementById('rankDisplay');
+const rankName = document.querySelector('.rank-name');
+const rankDivision = document.querySelector('.rank-division');
+const rankIcon = document.querySelector('.rank-icon');
+
 let paused = false;
+
+// Ranking System
+const RANKS = {
+  BRONZE: { name: 'Bronze', icon: '🥉', color: '#cd7f32', versions: 3, divisions: 3 },
+  SILVER: { name: 'Silver', icon: '🥈', color: '#c0c0c0', versions: 3, divisions: 3 },
+  GOLD: { name: 'Gold', icon: '🥇', color: '#ffd700', versions: 3, divisions: 3 },
+  PLATINUM: { name: 'Platinum', icon: '💎', color: '#e5e4e2', versions: 3, divisions: 3 },
+  DIAMOND: { name: 'Diamond', icon: '💠', color: '#b9f2ff', versions: 3, divisions: 3 },
+  MASTER: { name: 'Master Gunman', icon: '👑', color: '#ff6b35', versions: 1, divisions: 0 }
+};
+
+const RANK_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER'];
+
+// Player ranking data (stored in localStorage)
+let playerRank = {
+  rank: 'BRONZE',
+  version: 1,
+  division: 1,
+  wins: 0,
+  losses: 0,
+  totalGames: 0
+};
+
+// Load player rank from localStorage
+function loadPlayerRank() {
+  const saved = localStorage.getItem('playerRank');
+  if (saved) {
+    playerRank = { ...playerRank, ...JSON.parse(saved) };
+  }
+  updateRankDisplay();
+}
+
+// Save player rank to localStorage
+function savePlayerRank() {
+  localStorage.setItem('playerRank', JSON.stringify(playerRank));
+}
+
+// Update rank display
+function updateRankDisplay() {
+  const rankData = RANKS[playerRank.rank];
+  rankIcon.textContent = rankData.icon;
+  rankName.textContent = `${rankData.name} ${playerRank.version}`;
+  
+  if (rankData.divisions > 0) {
+    rankDivision.textContent = `Division ${playerRank.division}`;
+    rankDivision.style.display = 'block';
+  } else {
+    rankDivision.style.display = 'none';
+  }
+}
+
+// Handle win/loss and rank progression
+function handleGameResult(won) {
+  if (gameMode !== 'online') return;
+  
+  if (won) {
+    playerRank.wins++;
+    playerRank.totalGames++;
+    
+    // Progress division
+    const rankData = RANKS[playerRank.rank];
+    if (rankData.divisions > 0) {
+      playerRank.division++;
+      if (playerRank.division > rankData.divisions) {
+        playerRank.division = 1;
+        playerRank.version++;
+        if (playerRank.version > rankData.versions) {
+          // Rank up
+          const currentIndex = RANK_ORDER.indexOf(playerRank.rank);
+          if (currentIndex < RANK_ORDER.length - 1) {
+            playerRank.rank = RANK_ORDER[currentIndex + 1];
+            playerRank.version = 1;
+            playerRank.division = 1;
+          }
+        }
+      }
+    } else {
+      // Master Gunman - no divisions, just track wins
+      playerRank.wins++;
+    }
+  } else {
+    playerRank.losses++;
+    playerRank.totalGames++;
+    
+    // Lose division
+    const rankData = RANKS[playerRank.rank];
+    if (rankData.divisions > 0) {
+      playerRank.division--;
+      if (playerRank.division < 1) {
+        playerRank.version--;
+        if (playerRank.version < 1) {
+          // Rank down
+          const currentIndex = RANK_ORDER.indexOf(playerRank.rank);
+          if (currentIndex > 0) {
+            playerRank.rank = RANK_ORDER[currentIndex - 1];
+            const prevRank = RANKS[playerRank.rank];
+            playerRank.version = prevRank.versions;
+            playerRank.division = prevRank.divisions;
+          } else {
+            // Can't go below Bronze 1
+            playerRank.division = 1;
+          }
+        } else {
+          playerRank.division = rankData.divisions;
+        }
+      }
+    }
+  }
+  
+  savePlayerRank();
+  updateRankDisplay();
+}
+
+// Menu Navigation
+function showMainMenu() {
+  mainMenu.classList.remove('hidden');
+  gameSettings.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  draftOverlay.classList.add('hidden');
+  leaderboardOverlay.classList.add('hidden');
+  gameModeOptions.classList.remove('show');
+}
+
+function showGameSettings() {
+  mainMenu.classList.add('hidden');
+  gameSettings.classList.remove('hidden');
+}
+
+function showGameModeOptions() {
+  gameModeOptions.classList.add('show');
+}
+
+function hideGameModeOptions() {
+  gameModeOptions.classList.remove('show');
+}
+
+// Event Listeners
+playButton.addEventListener('click', showGameModeOptions);
+
+// Pause key binding
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && state === 'playing') {
+    setPaused(!paused);
+  }
+});
+
+vsAIButton.addEventListener('click', () => {
+  gameMode = 'vsAI';
+  hideGameModeOptions();
+  showGameSettings();
+});
+
+onlineButton.addEventListener('click', () => {
+  gameMode = 'online';
+  hideGameModeOptions();
+  
+  // Start online game (for now, just start with AI but track as online)
+  state = 'playing';
+  bullets = [];
+  particles.length = 0;
+  buildArena(currentArena);
+  currentArena = (currentArena + 1) % 4;
+  players[0].reset(); players[1].reset();
+  players[0].applyCards(); players[1].applyCards();
+  
+  // Hide the main menu
+  mainMenu.classList.add('hidden');
+});
+
+btnBackToMain.addEventListener('click', showMainMenu);
+
+leaderboardButton.addEventListener('click', () => {
+  leaderboardOverlay.classList.remove('hidden');
+  populateLeaderboard();
+});
+
+closeLeaderboard.addEventListener('click', () => {
+  leaderboardOverlay.classList.add('hidden');
+});
+
+// Tab switching for leaderboard
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    btn.classList.add('active');
+    const tabName = btn.dataset.tab;
+    document.getElementById(tabName + 'Leaderboard').classList.add('active');
+  });
+});
+
+// Populate leaderboard with sample data
+function populateLeaderboard() {
+  // Global leaderboard
+  const globalList = document.getElementById('globalList');
+  globalList.innerHTML = '';
+  
+  const samplePlayers = [
+    { name: 'ProGamer123', rank: 'MASTER', wins: 156, losses: 23 },
+    { name: 'ShooterElite', rank: 'MASTER', wins: 142, losses: 31 },
+    { name: 'BattleMaster', rank: 'MASTER', wins: 128, losses: 28 },
+    { name: 'GunSlinger', rank: 'DIAMOND', wins: 98, losses: 45 },
+    { name: 'AimGod', rank: 'DIAMOND', wins: 87, losses: 52 },
+    { name: 'QuickDraw', rank: 'PLATINUM', wins: 76, losses: 58 },
+    { name: 'BulletStorm', rank: 'PLATINUM', wins: 65, losses: 67 },
+    { name: 'TargetPractice', rank: 'GOLD', wins: 54, losses: 76 },
+    { name: 'Sharpshooter', rank: 'GOLD', wins: 43, losses: 85 },
+    { name: 'TriggerHappy', rank: 'SILVER', wins: 32, losses: 94 }
+  ];
+  
+  samplePlayers.forEach((player, index) => {
+    const rankData = RANKS[player.rank];
+    const playerEl = document.createElement('div');
+    playerEl.className = 'leaderboard-entry';
+    playerEl.innerHTML = `
+      <div class="entry-rank">#${index + 1}</div>
+      <div class="entry-icon">${rankData.icon}</div>
+      <div class="entry-name">${player.name}</div>
+      <div class="entry-rank-name">${rankData.name}</div>
+      <div class="entry-stats">${player.wins}W ${player.losses}L</div>
+    `;
+    globalList.appendChild(playerEl);
+  });
+  
+  // Rankings grid
+  const rankingsGrid = document.getElementById('rankingsGrid');
+  rankingsGrid.innerHTML = '';
+  
+  RANK_ORDER.forEach(rankKey => {
+    const rankData = RANKS[rankKey];
+    const rankEl = document.createElement('div');
+    rankEl.className = 'ranking-card';
+    rankEl.innerHTML = `
+      <div class="ranking-header">
+        <div class="ranking-icon">${rankData.icon}</div>
+        <div class="ranking-name">${rankData.name}</div>
+      </div>
+      <div class="ranking-structure">
+        ${rankData.versions > 1 ? `${rankData.versions} versions` : '1 version'}
+        ${rankData.divisions > 0 ? `• ${rankData.divisions} divisions each` : ''}
+      </div>
+    `;
+    rankingsGrid.appendChild(rankEl);
+  });
+}
+
+// Initialize
+loadPlayerRank();
+showMainMenu();
 
 // Resize
 function fit() {
@@ -207,24 +473,24 @@ function weightedRarity() {
 
 // Abilities list includes new tradeoff abilities
 const ALL_CARDS = [
-  { id: 'rapid', title: 'Rapid Fire', desc: 'Reduce fire delay', rarity: RARITY.Common },
-  { id: 'power', title: 'High Caliber', desc: 'Increase bullet damage', rarity: RARITY.Rare },
-  { id: 'speed', title: 'Sprinter', desc: 'Increase move speed', rarity: RARITY.Common },
-  { id: 'jumper', title: 'Bunny Hop', desc: 'Increase jump power', rarity: RARITY.Common },
-  { id: 'doublejump', title: 'Double Jump', desc: 'Gain extra jumps', rarity: RARITY.Rare },
-  { id: 'unstoppable', title: 'Unstoppable Bullets', desc: 'Bullets pass through platforms', rarity: RARITY.Legendary },
-  { id: 'bounce', title: 'Bouncy Bullets', desc: 'Bullets bounce', rarity: RARITY.Epic },
-  { id: 'sniper', title: 'Marksman', desc: 'Increase bullet speed', rarity: RARITY.Rare },
-  { id: 'explosive', title: 'Explosive Rounds', desc: 'Bullets explode', rarity: RARITY.Legendary },
-  { id: 'shield', title: 'Personal Shield', desc: 'Block a bullet periodically', rarity: RARITY.Epic },
-  { id: 'lifesteal', title: 'Vampiric Rounds', desc: 'Heal on hit', rarity: RARITY.Rare },
-  { id: 'hp', title: 'Toughness', desc: 'Increase max HP', rarity: RARITY.Common },
-  { id: 'multishot', title: 'Multishot', desc: '+1 pellet per level (spread)', rarity: RARITY.Rare },
-  { id: 'burst', title: 'Burst Fire', desc: 'Fires bursts of shots', rarity: RARITY.Epic },
-  { id: 'bigmag', title: 'Bigger Mag', desc: 'Increase magazine size', rarity: RARITY.Common },
-  { id: 'fastreload', title: 'Fast Reload', desc: 'Reduce reload time', rarity: RARITY.Rare },
-  { id: 'heavymag', title: 'Heavy Mag', desc: 'Huge mag, slower reload & movement', rarity: RARITY.Epic },
-  { id: 'glasscannon', title: 'Glass Cannon', desc: 'Big damage, lower max HP', rarity: RARITY.Epic },
+  { id: 'rapid', title: 'Rapid Fire', desc: 'Reduce fire delay', rarity: RARITY.Common, icon: '⚡' },
+  { id: 'power', title: 'High Caliber', desc: 'Increase bullet damage', rarity: RARITY.Rare, icon: '💥' },
+  { id: 'speed', title: 'Sprinter', desc: 'Increase move speed', rarity: RARITY.Common, icon: '🏃' },
+  { id: 'jumper', title: 'Bunny Hop', desc: 'Increase jump power', rarity: RARITY.Common, icon: '🦘' },
+  { id: 'doublejump', title: 'Double Jump', desc: 'Gain extra jumps', rarity: RARITY.Rare, icon: '🦅' },
+  { id: 'unstoppable', title: 'Unstoppable Bullets', desc: 'Bullets pass through platforms', rarity: RARITY.Legendary, icon: '🚀' },
+  { id: 'bounce', title: 'Bouncy Bullets', desc: 'Bullets bounce', rarity: RARITY.Epic, icon: '🏀' },
+  { id: 'sniper', title: 'Marksman', desc: 'Increase bullet speed', rarity: RARITY.Rare, icon: '🎯' },
+  { id: 'explosive', title: 'Explosive Rounds', desc: 'Bullets explode', rarity: RARITY.Legendary, icon: '💣' },
+  { id: 'shield', title: 'Personal Shield', desc: 'Block a bullet periodically', rarity: RARITY.Epic, icon: '🛡️' },
+  { id: 'lifesteal', title: 'Vampiric Rounds', desc: 'Heal on hit', rarity: RARITY.Rare, icon: '🩸' },
+  { id: 'hp', title: 'Toughness', desc: 'Increase max HP', rarity: RARITY.Common, icon: '❤️' },
+  { id: 'multishot', title: 'Multishot', desc: '+1 pellet per level (spread)', rarity: RARITY.Rare, icon: '🔫' },
+  { id: 'burst', title: 'Burst Fire', desc: 'Fires bursts of shots', rarity: RARITY.Epic, icon: '🔥' },
+  { id: 'bigmag', title: 'Bigger Mag', desc: 'Increase magazine size', rarity: RARITY.Common, icon: '📦' },
+  { id: 'fastreload', title: 'Fast Reload', desc: 'Reduce reload time', rarity: RARITY.Rare, icon: '⚡' },
+  { id: 'heavymag', title: 'Heavy Mag', desc: 'Huge mag, slower reload & movement', rarity: RARITY.Epic, icon: '🏋️' },
+  { id: 'glasscannon', title: 'Glass Cannon', desc: 'Big damage, lower max HP', rarity: RARITY.Epic, icon: '💎' },
 ];
 
 function generateDraftPool(forPlayer) {
@@ -258,15 +524,29 @@ let players = [
 let bullets = [];
 let winner = null;
 let state = 'menu'; // menu, playing, between
+let gameMode = 'vsAI'; // vsAI, online
 let lastTime = performance.now() / 1000;
 let simTime = 0;
 
-const menu = document.getElementById('menu');
 const difficultySel = document.getElementById('difficulty');
 startButton.onclick = () => {
-  menu.classList.add('hidden');
-  overlayHideDraft();
-  doStartMatch();
+  if (gameMode === 'vsAI') {
+    // Set difficulty based on selection
+    const difficulty = document.getElementById('difficulty').value;
+    setDifficulty(difficulty);
+    
+    // Start the game
+    state = 'playing';
+    bullets = [];
+    particles.length = 0;
+    buildArena(currentArena);
+    currentArena = (currentArena + 1) % 4;
+    players[0].reset(); players[1].reset();
+    players[0].applyCards(); players[1].applyCards();
+    
+    // Hide the menu
+    gameSettings.classList.add('hidden');
+  }
 };
 function overlayHideDraft() { draftOverlay.classList.add('hidden'); }
 
@@ -582,10 +862,16 @@ function endRound(winnerIdx) {
     // Between rounds: draft unless series is over
     if (seriesRoundIndex >= SERIES_ROUNDS_TOTAL) {
       // Series end
-      state = 'menu';
-      menu.classList.remove('hidden');
-      const msg = scores[0] === scores[1] ? 'Series tied! Play again' : `P${scores[0] > scores[1] ? 1 : 2} wins the series! Play again`;
-      startButton.textContent = msg;
+      if (gameMode === 'online') {
+        // Handle ranking for online mode
+        const playerWon = winnerIdx === 0;
+        handleGameResult(playerWon);
+      }
+      
+      // Show main menu
+      showMainMenu();
+      const msg = scores[0] === scores[1] ? 'Series tied! Play again' : `P${scores[0] > scores[1] ? 1 : 2} wins the series!`;
+      
       // Reset series
       scores = [0, 0];
       seriesRoundIndex = 1;
@@ -626,7 +912,7 @@ function doDraftFor(playerIdx, done) {
   for (const opt of pool) {
     const c = opt.card; const nextLevel = opt.nextLevel;
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<div class="card-title" style="color:${RARITY_COLOR[c.rarity]}">${c.title} · Lv.${nextLevel} · ${c.rarity}</div><div class="card-desc">${c.desc}</div>`;
+    el.innerHTML = `<div class="card-title" style="color:${RARITY_COLOR[c.rarity]}">${c.icon} ${c.title} · Lv.${nextLevel} · ${c.rarity}</div><div class="card-desc">${c.desc}</div>`;
     el.onclick = () => {
       players[playerIdx].levels[c.id] = Math.min(MAX_LEVEL, (players[playerIdx].levels[c.id] || 0) + 1);
       players[playerIdx].applyCards();
@@ -1447,7 +1733,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 btnResume?.addEventListener('click', () => setPaused(false));
-btnQuit?.addEventListener('click', () => { setPaused(false); state = 'menu'; menu.classList.remove('hidden'); });
+btnQuit?.addEventListener('click', () => { 
+  setPaused(false); 
+  showMainMenu(); 
+  // Reset game state when quitting to menu
+  state = 'menu';
+  bullets = [];
+  particles.length = 0;
+});
 
 // Improved sleek jump VFX
 function spawnPuff(x, y, color, count=8) {
