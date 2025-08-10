@@ -106,37 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Initialize leaderboard with realistic data
   function initializeLeaderboard() {
-    const realUsernames = [
-      'AlexTheGunner', 'SarahSniper', 'MikeRush', 'EmmaTactics', 'JakeAim',
-      'LisaQuick', 'TomBullet', 'AnnaPrecision', 'ChrisRapid', 'MayaShot',
-      'DavidTarget', 'SophieBlitz', 'RyanPulse', 'ZoeThunder', 'KevinFlash',
-      'RachelStorm', 'BrianViper', 'NinaShadow', 'MarkFury', 'ClaireBlaze'
-    ];
-    
-    leaderboardData = realUsernames.map((username, index) => {
-      const rank = Math.floor(Math.random() * 6); // 0-5 for ranks
-      const rankKey = RANK_ORDER[rank];
-      const rankData = RANKS[rankKey];
-      const wins = Math.floor(Math.random() * 200) + 50;
-      const losses = Math.floor(Math.random() * 100) + 20;
-      
-      return {
-        username,
-        rank: rankKey,
-        wins,
-        losses,
-        totalGames: wins + losses,
-        winRate: Math.round((wins / (wins + losses)) * 100)
-      };
-    });
-    
-    // Sort by rank and win rate
-    leaderboardData.sort((a, b) => {
-      const rankA = RANK_ORDER.indexOf(a.rank);
-      const rankB = RANK_ORDER.indexOf(b.rank);
-      if (rankA !== rankB) return rankB - rankA;
-      return b.winRate - a.winRate;
-    });
+    // Start with empty leaderboard - only real players will be added
+    leaderboardData = [];
   }
 
   // User authentication functions
@@ -310,149 +281,136 @@ document.addEventListener('DOMContentLoaded', function() {
     gameModeOptions.classList.remove('show');
   }
 
-// Event Listeners
-playButton.addEventListener('click', showGameModeOptions);
+  // Event Listeners
+  playButton.addEventListener('click', showGameModeOptions);
 
-// Pause key binding
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && state === 'playing') {
-    setPaused(!paused);
-  }
-});
-
-// Start button event listener
-startButton.addEventListener('click', () => {
-  if (gameMode === 'vsAI') {
-    const difficulty = document.getElementById('difficulty').value;
-    setDifficulty(difficulty);
-    state = 'playing';
-    bullets = [];
-    particles.length = 0;
-    buildArena(currentArena);
-    currentArena = (currentArena + 1) % 4;
-    players[0].reset(); players[1].reset();
-    players[0].applyCards(); players[1].applyCards();
-    gameSettings.classList.add('hidden');
-  } else if (gameMode === 'online') {
-    // For now, start with AI but track as online
-    state = 'playing';
-    bullets = [];
-    particles.length = 0;
-    buildArena(currentArena);
-    currentArena = (currentArena + 1) % 4;
-    players[0].reset(); players[1].reset();
-    players[0].applyCards(); players[1].applyCards();
-    gameSettings.classList.add('hidden');
-  }
-});
-
-vsAIButton.addEventListener('click', () => {
-  gameMode = 'vsAI';
-  hideGameModeOptions();
-  showGameSettings();
-});
-
-onlineButton.addEventListener('click', () => {
-  gameMode = 'online';
-  hideGameModeOptions();
-  
-  // Start online game (for now, just start with AI but track as online)
-  state = 'playing';
-  bullets = [];
-  particles.length = 0;
-  buildArena(currentArena);
-  currentArena = (currentArena + 1) % 4;
-  players[0].reset(); players[1].reset();
-  players[0].applyCards(); players[1].applyCards();
-  
-  // Hide the main menu
-  mainMenu.classList.add('hidden');
-});
-
-btnBackToMain.addEventListener('click', showMainMenu);
-
-leaderboardButton.addEventListener('click', () => {
-  leaderboardOverlay.classList.remove('hidden');
-  populateLeaderboard();
-});
-
-closeLeaderboard.addEventListener('click', () => {
-  leaderboardOverlay.classList.add('hidden');
-});
-
-// Tab switching for leaderboard
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    
-    btn.classList.add('active');
-    const tabName = btn.dataset.tab;
-    document.getElementById(tabName + 'Leaderboard').classList.add('active');
-  });
-});
-
-// Populate leaderboard with real data
-function populateLeaderboard() {
-  // Global leaderboard
-  const globalList = document.getElementById('globalList');
-  globalList.innerHTML = '';
-  
-  leaderboardData.forEach((player, index) => {
-    const rankData = RANKS[player.rank];
-    const playerEl = document.createElement('div');
-    playerEl.className = 'leaderboard-entry';
-    
-    // Highlight current user
-    const isCurrentUser = currentUser && player.username === currentUser.username;
-    if (isCurrentUser) {
-      playerEl.classList.add('current-user');
+  // Pause key binding
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && state === 'playing') {
+      setPaused(!paused);
     }
-    
-    playerEl.innerHTML = `
-      <div class="entry-rank">#${index + 1}</div>
-      <div class="entry-icon">${rankData.icon}</div>
-      <div class="entry-name">${player.username}</div>
-      <div class="entry-rank-name">${rankData.name}</div>
-      <div class="entry-stats">${player.wins}W ${player.losses}L (${player.winRate}%)</div>
-    `;
-    globalList.appendChild(playerEl);
   });
-  
-  // Rankings grid
-  const rankingsGrid = document.getElementById('rankingsGrid');
-  rankingsGrid.innerHTML = '';
-  
-  RANK_ORDER.forEach(rankKey => {
-    const rankData = RANKS[rankKey];
-    const rankEl = document.createElement('div');
-    rankEl.className = 'ranking-card';
-    rankEl.innerHTML = `
-      <div class="ranking-header">
-        <div class="ranking-icon">${rankData.icon}</div>
-        <div class="ranking-name">${rankData.name}</div>
-      </div>
-      <div class="ranking-structure">
-        ${rankData.versions > 1 ? `${rankData.versions} versions` : '1 version'}
-        ${rankData.divisions > 0 ? `• ${rankData.divisions} divisions each` : ''}
-      </div>
-    `;
-    rankingsGrid.appendChild(rankEl);
-  });
-}
 
-// Authentication event listeners
-loginBtn.addEventListener('click', handleLogin);
-signupBtn.addEventListener('click', handleSignup);
-showSignupBtn.addEventListener('click', () => {
-  loginForm.classList.add('hidden');
-  signupForm.classList.remove('hidden');
-});
-showLoginBtn.addEventListener('click', () => {
-  signupForm.classList.add('hidden');
-  loginForm.classList.remove('hidden');
-});
-logoutBtn.addEventListener('click', logout);
+  // Start button event listener
+  startButton.addEventListener('click', () => {
+    if (gameMode === 'vsAI') {
+      const difficulty = document.getElementById('difficulty').value;
+      setDifficulty(difficulty);
+      state = 'playing';
+      bullets = [];
+      particles.length = 0;
+      buildArena(currentArena);
+      currentArena = (currentArena + 1) % 4;
+      players[0].reset(); players[1].reset();
+      players[0].applyCards(); players[1].applyCards();
+      gameSettings.classList.add('hidden');
+    } else if (gameMode === 'online') {
+      // For now, start with AI but track as online
+      state = 'playing';
+      bullets = [];
+      particles.length = 0;
+      buildArena(currentArena);
+      currentArena = (currentArena + 1) % 4;
+      players[0].reset(); players[1].reset();
+      players[0].applyCards(); players[1].applyCards();
+      gameSettings.classList.add('hidden');
+    }
+  });
+
+  vsAIButton.addEventListener('click', () => {
+    gameMode = 'vsAI';
+    hideGameModeOptions();
+    showGameSettings();
+  });
+
+  onlineButton.addEventListener('click', () => {
+    gameMode = 'online';
+    hideGameModeOptions();
+    
+    // Start online game (for now, just start with AI but track as online)
+    state = 'playing';
+    bullets = [];
+    particles.length = 0;
+    buildArena(currentArena);
+    currentArena = (currentArena + 1) % 4;
+    players[0].reset(); players[1].reset();
+    players[0].applyCards(); players[1].applyCards();
+    
+    // Hide the main menu
+    mainMenu.classList.add('hidden');
+  });
+
+  btnBackToMain.addEventListener('click', showMainMenu);
+
+  leaderboardButton.addEventListener('click', () => {
+    leaderboardOverlay.classList.remove('hidden');
+    populateLeaderboard();
+  });
+
+  closeLeaderboard.addEventListener('click', () => {
+    leaderboardOverlay.classList.add('hidden');
+  });
+
+  // Tab switching for leaderboard
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('hidden'));
+      
+      btn.classList.add('active');
+      const tabName = btn.dataset.tab;
+      document.getElementById(tabName + 'Leaderboard').classList.add('active');
+    });
+  });
+
+  // Populate leaderboard with real data
+  function populateLeaderboard() {
+    // Global leaderboard
+    const globalList = document.getElementById('globalList');
+    globalList.innerHTML = '';
+    
+    leaderboardData.forEach((player, index) => {
+      const rankData = RANKS[player.rank];
+      const playerEl = document.createElement('div');
+      playerEl.className = 'leaderboard-entry';
+      
+      // Highlight current user
+      const isCurrentUser = currentUser && player.username === currentUser.username;
+      if (isCurrentUser) {
+        playerEl.classList.add('current-user');
+      }
+      
+      playerEl.innerHTML = `
+        <div class="entry-rank">#${index + 1}</div>
+        <div class="entry-icon">${rankData.icon}</div>
+        <div class="entry-name">${player.username}</div>
+        <div class="entry-rank-name">${rankData.name}</div>
+        <div class="entry-stats">${player.wins}W ${player.losses}L (${player.winRate}%)</div>
+      `;
+      globalList.appendChild(playerEl);
+    });
+    
+    // Rankings grid
+    const rankingsGrid = document.getElementById('rankingsGrid');
+    rankingsGrid.innerHTML = '';
+    
+    RANK_ORDER.forEach(rankKey => {
+      const rankData = RANKS[rankKey];
+      const rankEl = document.createElement('div');
+      rankEl.className = 'ranking-card';
+      rankEl.innerHTML = `
+        <div class="ranking-header">
+          <div class="ranking-icon">${rankData.icon}</div>
+          <div class="ranking-name">${rankData.name}</div>
+        </div>
+        <div class="ranking-structure">
+          ${rankData.versions > 1 ? `${rankData.versions} versions` : '1 version'}
+          ${rankData.divisions > 0 ? `• ${rankData.divisions} divisions each` : ''}
+        </div>
+      `;
+      rankingsGrid.appendChild(rankEl);
+    });
+  }
 
         // Main menu login button (for guest users)
         document.getElementById('mainMenuLoginBtn').addEventListener('click', () => {
