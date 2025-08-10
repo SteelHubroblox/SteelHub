@@ -276,12 +276,14 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('showGameModeOptions called');
     console.log('gameModeOptions element:', gameModeOptions);
     console.log('gameModeOptions classes before:', gameModeOptions.className);
+    gameModeOptions.classList.remove('hidden');
     gameModeOptions.classList.add('show');
     console.log('gameModeOptions classes after:', gameModeOptions.className);
   }
 
   function hideGameModeOptions() {
     gameModeOptions.classList.remove('show');
+    gameModeOptions.classList.add('hidden');
   }
 
   // Event Listeners
@@ -326,12 +328,14 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   vsAIButton.addEventListener('click', () => {
+    console.log('VS AI button clicked!');
     gameMode = 'vsAI';
     hideGameModeOptions();
     showGameSettings();
   });
 
   onlineButton.addEventListener('click', () => {
+    console.log('Online button clicked!');
     gameMode = 'online';
     hideGameModeOptions();
     
