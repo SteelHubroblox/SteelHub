@@ -292,28 +292,7 @@ function handleGameResult(won) {
   updateRankDisplay();
 }
 
-// Menu Navigation
-function showMainMenu() {
-  mainMenu.classList.remove('hidden');
-  gameSettings.classList.add('hidden');
-  pauseOverlay.classList.add('hidden');
-  draftOverlay.classList.add('hidden');
-  leaderboardOverlay.classList.add('hidden');
-  gameModeOptions.classList.remove('show');
-  
-  // Update user info display
-  if (currentUser) {
-    currentUsername.textContent = currentUser.username;
-    document.getElementById('loginBtn').style.display = 'none';
-    document.getElementById('logoutBtn').style.display = 'block';
-  } else {
-    currentUsername.textContent = 'Guest Player';
-    document.getElementById('loginBtn').style.display = 'block';
-    document.getElementById('logoutBtn').style.display = 'none';
-  }
-  
-  loadPlayerRank();
-}
+
 
 function showGameSettings() {
   mainMenu.classList.add('hidden');
@@ -1680,8 +1659,8 @@ function drawRoundedRect(x, y, w, h, r) {
 // Drawing polish: player head
 function drawPlayer(p) {
   // hp bar
-  ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 16, p.w + 4, 6, 3); ctx.fill();
-  ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 16, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
+  ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 25, p.w + 4, 6, 3); ctx.fill();
+  ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 25, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; drawRoundedRect(Math.floor(p.x)+2, Math.floor(p.y)+6, p.w, p.h, 12); ctx.fill();
   // body
