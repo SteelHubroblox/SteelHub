@@ -1,172 +1,175 @@
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize DOM elements
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
 
-// DOM Elements
-const authOverlay = document.getElementById('authOverlay');
-const loginForm = document.getElementById('loginForm');
-const signupForm = document.getElementById('signupForm');
-const loginBtn = document.getElementById('loginBtn');
-const signupBtn = document.getElementById('signupBtn');
-const showSignupBtn = document.getElementById('showSignupBtn');
-const showLoginBtn = document.getElementById('showLoginBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-const currentUsername = document.getElementById('currentUsername');
+  // DOM Elements
+  const authOverlay = document.getElementById('authOverlay');
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  const loginBtn = document.getElementById('loginBtn');
+  const signupBtn = document.getElementById('signupBtn');
+  const showSignupBtn = document.getElementById('showSignupBtn');
+  const showLoginBtn = document.getElementById('showLoginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const currentUsername = document.getElementById('currentUsername');
 
-const mainMenu = document.getElementById('mainMenu');
-const gameSettings = document.getElementById('gameSettings');
-const playButton = document.getElementById('playButton');
-const gameModeOptions = document.getElementById('gameModeOptions');
-const vsAIButton = document.getElementById('vsAI');
-const onlineButton = document.getElementById('online');
-const btnBackToMain = document.getElementById('btnBackToMain');
-const startButton = document.getElementById('startButton');
-const draftOverlay = document.getElementById('draftOverlay');
-const draftPlayerLabel = document.getElementById('draftPlayerLabel');
-const cardGrid = document.getElementById('cardGrid');
-const pauseOverlay = document.getElementById('pauseOverlay');
-const btnResume = document.getElementById('btnResume');
-const btnQuit = document.getElementById('btnQuit');
-const leaderboardOverlay = document.getElementById('leaderboardOverlay');
-const leaderboardButton = document.getElementById('leaderboardButton');
-const closeLeaderboard = document.getElementById('closeLeaderboard');
-const rankDisplay = document.getElementById('rankDisplay');
-const rankName = document.querySelector('.rank-name');
-const rankDivision = document.querySelector('.rank-division');
-const rankIcon = document.querySelector('.rank-icon');
+  const mainMenu = document.getElementById('mainMenu');
+  const gameSettings = document.getElementById('gameSettings');
+  const playButton = document.getElementById('playButton');
+  const gameModeOptions = document.getElementById('gameModeOptions');
+  const vsAIButton = document.getElementById('vsAI');
+  const onlineButton = document.getElementById('online');
+  const btnBackToMain = document.getElementById('btnBackToMain');
+  const startButton = document.getElementById('startButton');
+  const draftOverlay = document.getElementById('draftOverlay');
+  const draftPlayerLabel = document.getElementById('draftPlayerLabel');
+  const cardGrid = document.getElementById('cardGrid');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const btnResume = document.getElementById('btnResume');
+  const btnQuit = document.getElementById('btnQuit');
+  const leaderboardOverlay = document.getElementById('leaderboardOverlay');
+  const leaderboardButton = document.getElementById('leaderboardButton');
+  const closeLeaderboard = document.getElementById('closeLeaderboard');
+  const rankDisplay = document.getElementById('rankDisplay');
+  const rankName = document.querySelector('.rank-name');
+  const rankDivision = document.querySelector('.rank-division');
+  const rankIcon = document.querySelector('.rank-icon');
 
-let paused = false;
+  let paused = false;
 
-// Ranking System
-const RANKS = {
-  BRONZE: { name: 'Bronze', icon: '🥉', color: '#cd7f32', versions: 3, divisions: 3 },
-  SILVER: { name: 'Silver', icon: '🥈', color: '#c0c0c0', versions: 3, divisions: 3 },
-  GOLD: { name: 'Gold', icon: '🥇', color: '#ffd700', versions: 3, divisions: 3 },
-  PLATINUM: { name: 'Platinum', icon: '💎', color: '#e5e4e2', versions: 3, divisions: 3 },
-  DIAMOND: { name: 'Diamond', icon: '💠', color: '#b9f2ff', versions: 3, divisions: 3 },
-  MASTER: { name: 'Master Gunman', icon: '👑', color: '#ff6b35', versions: 1, divisions: 0 }
-};
+  // Ranking System
+  const RANKS = {
+    BRONZE: { name: 'Bronze', icon: '🥉', color: '#cd7f32', versions: 3, divisions: 3 },
+    SILVER: { name: 'Silver', icon: '🥈', color: '#c0c0c0', versions: 3, divisions: 3 },
+    GOLD: { name: 'Gold', icon: '🥇', color: '#ffd700', versions: 3, divisions: 3 },
+    PLATINUM: { name: 'Platinum', icon: '💎', color: '#e5e4e2', versions: 3, divisions: 3 },
+    DIAMOND: { name: 'Diamond', icon: '💠', color: '#b9f2ff', versions: 3, divisions: 3 },
+    MASTER: { name: 'Master Gunman', icon: '👑', color: '#ff6b35', versions: 1, divisions: 0 }
+  };
 
-const RANK_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER'];
+  const RANK_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER'];
 
-// User authentication system
-let currentUser = null;
-let users = {};
+  // User authentication system
+  let currentUser = null;
+  let users = {};
 
-// Player ranking data (stored in localStorage)
-let playerRank = {
-  rank: 'BRONZE',
-  version: 1,
-  division: 1,
-  wins: 0,
-  losses: 0,
-  totalGames: 0
-};
+  // Player ranking data (stored in localStorage)
+  let playerRank = {
+    rank: 'BRONZE',
+    version: 1,
+    division: 1,
+    wins: 0,
+    losses: 0,
+    totalGames: 0
+  };
 
-// Real leaderboard data (stored in localStorage)
-let leaderboardData = [];
+  // Real leaderboard data (stored in localStorage)
+  let leaderboardData = [];
 
-// Load data from localStorage
-function loadData() {
-  // Load users
-  const savedUsers = localStorage.getItem('gameUsers');
-  if (savedUsers) {
-    users = JSON.parse(savedUsers);
-  }
-  
-  // Load leaderboard
-  const savedLeaderboard = localStorage.getItem('gameLeaderboard');
-  if (savedLeaderboard) {
-    leaderboardData = JSON.parse(savedLeaderboard);
-  } else {
-    // Initialize with some real-looking data
-    initializeLeaderboard();
-  }
-  
-  // Load current user (optional)
-  const savedUser = localStorage.getItem('currentUser');
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-  }
-  
-  // Always show main menu (no authentication required)
-  showMainMenu();
-}
-
-// Save data to localStorage
-function saveData() {
-  localStorage.setItem('gameUsers', JSON.stringify(users));
-  localStorage.setItem('gameLeaderboard', JSON.stringify(leaderboardData));
-  if (currentUser) {
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-  }
-}
-
-// Initialize leaderboard with realistic data
-function initializeLeaderboard() {
-  const realUsernames = [
-    'AlexTheGunner', 'SarahSniper', 'MikeRush', 'EmmaTactics', 'JakeAim',
-    'LisaQuick', 'TomBullet', 'AnnaPrecision', 'ChrisRapid', 'MayaShot',
-    'DavidTarget', 'SophieBlitz', 'RyanPulse', 'ZoeThunder', 'KevinFlash',
-    'RachelStorm', 'BrianViper', 'NinaShadow', 'MarkFury', 'ClaireBlaze'
-  ];
-  
-  leaderboardData = realUsernames.map((username, index) => {
-    const rank = Math.floor(Math.random() * 6); // 0-5 for ranks
-    const rankKey = RANK_ORDER[rank];
-    const rankData = RANKS[rankKey];
-    const wins = Math.floor(Math.random() * 200) + 50;
-    const losses = Math.floor(Math.random() * 100) + 20;
+  // Load data from localStorage
+  function loadData() {
+    // Load users
+    const savedUsers = localStorage.getItem('gameUsers');
+    if (savedUsers) {
+      users = JSON.parse(savedUsers);
+    }
     
-    return {
-      username,
-      rank: rankKey,
-      wins,
-      losses,
-      totalGames: wins + losses,
-      winRate: Math.round((wins / (wins + losses)) * 100)
-    };
-  });
-  
-  // Sort by rank and win rate
-  leaderboardData.sort((a, b) => {
-    const rankA = RANK_ORDER.indexOf(a.rank);
-    const rankB = RANK_ORDER.indexOf(b.rank);
-    if (rankA !== rankB) return rankB - rankA;
-    return b.winRate - a.winRate;
-  });
-}
-
-// User authentication functions
-function showAuthOverlay() {
-  authOverlay.classList.remove('hidden');
-  mainMenu.classList.add('hidden');
-}
-
-function hideAuthOverlay() {
-  authOverlay.classList.add('hidden');
-}
-
-function showMainMenu() {
-  mainMenu.classList.remove('hidden');
-  gameSettings.classList.add('hidden');
-  pauseOverlay.classList.add('hidden');
-  draftOverlay.classList.add('hidden');
-  leaderboardOverlay.classList.add('hidden');
-  gameModeOptions.classList.remove('show');
-  
-  // Update user info display
-  if (currentUser) {
-    currentUsername.textContent = currentUser.username;
-    document.getElementById('loginBtn').style.display = 'none';
-    document.getElementById('logoutBtn').style.display = 'block';
-  } else {
-    currentUsername.textContent = 'Guest Player';
-    document.getElementById('loginBtn').style.display = 'block';
-    document.getElementById('logoutBtn').style.display = 'none';
+    // Load leaderboard
+    const savedLeaderboard = localStorage.getItem('gameLeaderboard');
+    if (savedLeaderboard) {
+      leaderboardData = JSON.parse(savedLeaderboard);
+    } else {
+      // Initialize with some real-looking data
+      initializeLeaderboard();
+    }
+    
+    // Load current user (optional)
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      currentUser = JSON.parse(savedUser);
+    }
+    
+    // Always show main menu (no authentication required)
+    showMainMenu();
   }
-  
-  loadPlayerRank();
-}
+
+  // Save data to localStorage
+  function saveData() {
+    localStorage.setItem('gameUsers', JSON.stringify(users));
+    localStorage.setItem('gameLeaderboard', JSON.stringify(leaderboardData));
+    if (currentUser) {
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+  }
+
+  // Initialize leaderboard with realistic data
+  function initializeLeaderboard() {
+    const realUsernames = [
+      'AlexTheGunner', 'SarahSniper', 'MikeRush', 'EmmaTactics', 'JakeAim',
+      'LisaQuick', 'TomBullet', 'AnnaPrecision', 'ChrisRapid', 'MayaShot',
+      'DavidTarget', 'SophieBlitz', 'RyanPulse', 'ZoeThunder', 'KevinFlash',
+      'RachelStorm', 'BrianViper', 'NinaShadow', 'MarkFury', 'ClaireBlaze'
+    ];
+    
+    leaderboardData = realUsernames.map((username, index) => {
+      const rank = Math.floor(Math.random() * 6); // 0-5 for ranks
+      const rankKey = RANK_ORDER[rank];
+      const rankData = RANKS[rankKey];
+      const wins = Math.floor(Math.random() * 200) + 50;
+      const losses = Math.floor(Math.random() * 100) + 20;
+      
+      return {
+        username,
+        rank: rankKey,
+        wins,
+        losses,
+        totalGames: wins + losses,
+        winRate: Math.round((wins / (wins + losses)) * 100)
+      };
+    });
+    
+    // Sort by rank and win rate
+    leaderboardData.sort((a, b) => {
+      const rankA = RANK_ORDER.indexOf(a.rank);
+      const rankB = RANK_ORDER.indexOf(b.rank);
+      if (rankA !== rankB) return rankB - rankA;
+      return b.winRate - a.winRate;
+    });
+  }
+
+  // User authentication functions
+  function showAuthOverlay() {
+    authOverlay.classList.remove('hidden');
+    mainMenu.classList.add('hidden');
+  }
+
+  function hideAuthOverlay() {
+    authOverlay.classList.add('hidden');
+  }
+
+  function showMainMenu() {
+    mainMenu.classList.remove('hidden');
+    gameSettings.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
+    draftOverlay.classList.add('hidden');
+    leaderboardOverlay.classList.add('hidden');
+    gameModeOptions.classList.remove('show');
+    
+    // Update user info display
+    if (currentUser) {
+      currentUsername.textContent = currentUser.username;
+      document.getElementById('loginBtn').style.display = 'none';
+      document.getElementById('logoutBtn').style.display = 'block';
+    } else {
+      currentUsername.textContent = 'Guest Player';
+      document.getElementById('loginBtn').style.display = 'block';
+      document.getElementById('logoutBtn').style.display = 'none';
+    }
+    
+    loadPlayerRank();
+  }
 
 function logout() {
   currentUser = null;
@@ -1663,10 +1666,12 @@ function drawPlayer(p) {
   ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 25, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; drawRoundedRect(Math.floor(p.x)+2, Math.floor(p.y)+6, p.w, p.h, 12); ctx.fill();
-  // body
+  // body with black border
   ctx.fillStyle = p.color; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.fill();
-  // head
+  ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.stroke();
+  // head with black border
   ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.stroke();
   // eye
   ctx.fillStyle = '#0b1020'; ctx.beginPath(); ctx.arc(p.x + p.w/2 + (p.facing>0?4:-4), p.y - 12, 2, 0, Math.PI*2); ctx.fill();
   // shield outline
@@ -1799,6 +1804,42 @@ function drawPlatform(s) {
   } else {
     // Default platform
     drawDefaultPlatform(s);
+  }
+  
+  // Add black border to all platforms for better contrast
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  if (s.type === 'ground') {
+    ctx.strokeRect(s.x, s.y, s.w, s.h);
+  } else if (s.shape === 'rounded') {
+    ctx.beginPath();
+    ctx.moveTo(s.x + 8, s.y);
+    ctx.lineTo(s.x + s.w - 8, s.y);
+    ctx.quadraticCurveTo(s.x + s.w, s.y, s.x + s.w, s.y + 8);
+    ctx.lineTo(s.x + s.w, s.y + s.h - 8);
+    ctx.quadraticCurveTo(s.x + s.w, s.y + s.h, s.x + s.w - 8, s.y + s.h);
+    ctx.lineTo(s.x + 8, s.y + s.h);
+    ctx.quadraticCurveTo(s.x, s.y + s.h, s.x, s.y + s.h - 8);
+    ctx.lineTo(s.x, s.y + 8);
+    ctx.quadraticCurveTo(s.x, s.y, s.x + 8, s.y);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (s.shape === 'crystal') {
+    const segments = 6;
+    const segmentWidth = s.w / segments;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y + s.h);
+    for (let i = 0; i <= segments; i++) {
+      const x = s.x + i * segmentWidth;
+      const y = s.y + (i % 2 === 0 ? 0 : s.h * 0.3);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(s.x + s.w, s.y + s.h);
+    ctx.closePath();
+    ctx.stroke();
+  } else {
+    // Default rectangular border
+    ctx.strokeRect(s.x, s.y, s.w, s.h);
   }
   
   ctx.restore();

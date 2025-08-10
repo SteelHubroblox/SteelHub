@@ -46,6 +46,11 @@ html, body {
   z-index: 20;
 }
 
+/* Auth overlay should be on top */
+#authOverlay {
+  z-index: 30;
+}
+
 /* Authentication Styles */
 .auth-container {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
