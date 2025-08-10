@@ -160,11 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update user info display
     if (currentUser) {
       currentUsername.textContent = currentUser.username;
-      document.getElementById('loginBtn').style.display = 'none';
+      document.getElementById('mainMenuLoginBtn').style.display = 'none';
       document.getElementById('logoutBtn').style.display = 'block';
     } else {
       currentUsername.textContent = 'Guest Player';
-      document.getElementById('loginBtn').style.display = 'block';
+      document.getElementById('mainMenuLoginBtn').style.display = 'block';
       document.getElementById('logoutBtn').style.display = 'none';
     }
     
@@ -454,13 +454,13 @@ showLoginBtn.addEventListener('click', () => {
 });
 logoutBtn.addEventListener('click', logout);
 
-// Main menu login button (for guest users)
-document.getElementById('loginBtn').addEventListener('click', () => {
-  mainMenu.classList.add('hidden');
-  authOverlay.classList.remove('hidden');
-  loginForm.classList.remove('hidden');
-  signupForm.classList.add('hidden');
-});
+        // Main menu login button (for guest users)
+        document.getElementById('mainMenuLoginBtn').addEventListener('click', () => {
+          mainMenu.classList.add('hidden');
+          authOverlay.classList.remove('hidden');
+          loginForm.classList.remove('hidden');
+          signupForm.classList.add('hidden');
+        });
 
 // Handle login
 function handleLogin() {

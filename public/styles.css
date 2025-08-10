@@ -48,7 +48,7 @@ html, body {
 
 /* Auth overlay should be on top */
 #authOverlay {
-  z-index: 30;
+  z-index: 100;
 }
 
 /* Authentication Styles */
