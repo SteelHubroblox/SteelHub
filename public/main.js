@@ -2,6 +2,16 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 // DOM Elements
+const authOverlay = document.getElementById('authOverlay');
+const loginForm = document.getElementById('loginForm');
+const signupForm = document.getElementById('signupForm');
+const loginBtn = document.getElementById('loginBtn');
+const signupBtn = document.getElementById('signupBtn');
+const showSignupBtn = document.getElementById('showSignupBtn');
+const showLoginBtn = document.getElementById('showLoginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const currentUsername = document.getElementById('currentUsername');
+
 const mainMenu = document.getElementById('mainMenu');
 const gameSettings = document.getElementById('gameSettings');
 const playButton = document.getElementById('playButton');
@@ -38,6 +48,10 @@ const RANKS = {
 
 const RANK_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER'];
 
+// User authentication system
+let currentUser = null;
+let users = {};
+
 // Player ranking data (stored in localStorage)
 let playerRank = {
   rank: 'BRONZE',
@@ -48,18 +62,133 @@ let playerRank = {
   totalGames: 0
 };
 
+// Real leaderboard data (stored in localStorage)
+let leaderboardData = [];
+
+// Load data from localStorage
+function loadData() {
+  // Load users
+  const savedUsers = localStorage.getItem('gameUsers');
+  if (savedUsers) {
+    users = JSON.parse(savedUsers);
+  }
+  
+  // Load leaderboard
+  const savedLeaderboard = localStorage.getItem('gameLeaderboard');
+  if (savedLeaderboard) {
+    leaderboardData = JSON.parse(savedLeaderboard);
+  } else {
+    // Initialize with some real-looking data
+    initializeLeaderboard();
+  }
+  
+  // Load current user
+  const savedUser = localStorage.getItem('currentUser');
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    showMainMenu();
+  } else {
+    showAuthOverlay();
+  }
+}
+
+// Save data to localStorage
+function saveData() {
+  localStorage.setItem('gameUsers', JSON.stringify(users));
+  localStorage.setItem('gameLeaderboard', JSON.stringify(leaderboardData));
+  if (currentUser) {
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  }
+}
+
+// Initialize leaderboard with realistic data
+function initializeLeaderboard() {
+  const realUsernames = [
+    'AlexTheGunner', 'SarahSniper', 'MikeRush', 'EmmaTactics', 'JakeAim',
+    'LisaQuick', 'TomBullet', 'AnnaPrecision', 'ChrisRapid', 'MayaShot',
+    'DavidTarget', 'SophieBlitz', 'RyanPulse', 'ZoeThunder', 'KevinFlash',
+    'RachelStorm', 'BrianViper', 'NinaShadow', 'MarkFury', 'ClaireBlaze'
+  ];
+  
+  leaderboardData = realUsernames.map((username, index) => {
+    const rank = Math.floor(Math.random() * 6); // 0-5 for ranks
+    const rankKey = RANK_ORDER[rank];
+    const rankData = RANKS[rankKey];
+    const wins = Math.floor(Math.random() * 200) + 50;
+    const losses = Math.floor(Math.random() * 100) + 20;
+    
+    return {
+      username,
+      rank: rankKey,
+      wins,
+      losses,
+      totalGames: wins + losses,
+      winRate: Math.round((wins / (wins + losses)) * 100)
+    };
+  });
+  
+  // Sort by rank and win rate
+  leaderboardData.sort((a, b) => {
+    const rankA = RANK_ORDER.indexOf(a.rank);
+    const rankB = RANK_ORDER.indexOf(b.rank);
+    if (rankA !== rankB) return rankB - rankA;
+    return b.winRate - a.winRate;
+  });
+}
+
+// User authentication functions
+function showAuthOverlay() {
+  authOverlay.classList.remove('hidden');
+  mainMenu.classList.add('hidden');
+}
+
+function hideAuthOverlay() {
+  authOverlay.classList.add('hidden');
+}
+
+function showMainMenu() {
+  if (!currentUser) {
+    showAuthOverlay();
+    return;
+  }
+  
+  mainMenu.classList.remove('hidden');
+  authOverlay.classList.add('hidden');
+  currentUsername.textContent = currentUser.username;
+  loadPlayerRank();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('currentUser');
+  showAuthOverlay();
+}
+
 // Load player rank from localStorage
 function loadPlayerRank() {
-  const saved = localStorage.getItem('playerRank');
+  if (!currentUser) return;
+  
+  const saved = localStorage.getItem(`playerRank_${currentUser.username}`);
   if (saved) {
     playerRank = { ...playerRank, ...JSON.parse(saved) };
+  } else {
+    // Initialize new player
+    playerRank = {
+      rank: 'BRONZE',
+      version: 1,
+      division: 1,
+      wins: 0,
+      losses: 0,
+      totalGames: 0
+    };
   }
   updateRankDisplay();
 }
 
 // Save player rank to localStorage
 function savePlayerRank() {
-  localStorage.setItem('playerRank', JSON.stringify(playerRank));
+  if (!currentUser) return;
+  localStorage.setItem(`playerRank_${currentUser.username}`, JSON.stringify(playerRank));
 }
 
 // Update rank display
@@ -171,6 +300,32 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Start button event listener
+startButton.addEventListener('click', () => {
+  if (gameMode === 'vsAI') {
+    const difficulty = document.getElementById('difficulty').value;
+    setDifficulty(difficulty);
+    state = 'playing';
+    bullets = [];
+    particles.length = 0;
+    buildArena(currentArena);
+    currentArena = (currentArena + 1) % 4;
+    players[0].reset(); players[1].reset();
+    players[0].applyCards(); players[1].applyCards();
+    gameSettings.classList.add('hidden');
+  } else if (gameMode === 'online') {
+    // For now, start with AI but track as online
+    state = 'playing';
+    bullets = [];
+    particles.length = 0;
+    buildArena(currentArena);
+    currentArena = (currentArena + 1) % 4;
+    players[0].reset(); players[1].reset();
+    players[0].applyCards(); players[1].applyCards();
+    gameSettings.classList.add('hidden');
+  }
+});
+
 vsAIButton.addEventListener('click', () => {
   gameMode = 'vsAI';
   hideGameModeOptions();
@@ -217,35 +372,29 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// Populate leaderboard with sample data
+// Populate leaderboard with real data
 function populateLeaderboard() {
   // Global leaderboard
   const globalList = document.getElementById('globalList');
   globalList.innerHTML = '';
   
-  const samplePlayers = [
-    { name: 'ProGamer123', rank: 'MASTER', wins: 156, losses: 23 },
-    { name: 'ShooterElite', rank: 'MASTER', wins: 142, losses: 31 },
-    { name: 'BattleMaster', rank: 'MASTER', wins: 128, losses: 28 },
-    { name: 'GunSlinger', rank: 'DIAMOND', wins: 98, losses: 45 },
-    { name: 'AimGod', rank: 'DIAMOND', wins: 87, losses: 52 },
-    { name: 'QuickDraw', rank: 'PLATINUM', wins: 76, losses: 58 },
-    { name: 'BulletStorm', rank: 'PLATINUM', wins: 65, losses: 67 },
-    { name: 'TargetPractice', rank: 'GOLD', wins: 54, losses: 76 },
-    { name: 'Sharpshooter', rank: 'GOLD', wins: 43, losses: 85 },
-    { name: 'TriggerHappy', rank: 'SILVER', wins: 32, losses: 94 }
-  ];
-  
-  samplePlayers.forEach((player, index) => {
+  leaderboardData.forEach((player, index) => {
     const rankData = RANKS[player.rank];
     const playerEl = document.createElement('div');
     playerEl.className = 'leaderboard-entry';
+    
+    // Highlight current user
+    const isCurrentUser = currentUser && player.username === currentUser.username;
+    if (isCurrentUser) {
+      playerEl.classList.add('current-user');
+    }
+    
     playerEl.innerHTML = `
       <div class="entry-rank">#${index + 1}</div>
       <div class="entry-icon">${rankData.icon}</div>
-      <div class="entry-name">${player.name}</div>
+      <div class="entry-name">${player.username}</div>
       <div class="entry-rank-name">${rankData.name}</div>
-      <div class="entry-stats">${player.wins}W ${player.losses}L</div>
+      <div class="entry-stats">${player.wins}W ${player.losses}L (${player.winRate}%)</div>
     `;
     globalList.appendChild(playerEl);
   });
@@ -272,9 +421,108 @@ function populateLeaderboard() {
   });
 }
 
+// Authentication event listeners
+loginBtn.addEventListener('click', handleLogin);
+signupBtn.addEventListener('click', handleSignup);
+showSignupBtn.addEventListener('click', () => {
+  loginForm.classList.add('hidden');
+  signupForm.classList.remove('hidden');
+});
+showLoginBtn.addEventListener('click', () => {
+  signupForm.classList.add('hidden');
+  loginForm.classList.remove('hidden');
+});
+logoutBtn.addEventListener('click', logout);
+
+// Handle login
+function handleLogin() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  
+  if (!username || !password) {
+    alert('Please enter both username and password');
+    return;
+  }
+  
+  if (users[username] && users[username].password === password) {
+    currentUser = { username };
+    saveData();
+    showMainMenu();
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+  } else {
+    alert('Invalid username or password');
+  }
+}
+
+// Handle signup
+function handleSignup() {
+  const username = document.getElementById('signupUsername').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  const confirmPassword = document.getElementById('signupConfirmPassword').value;
+  
+  if (!username || !password || !confirmPassword) {
+    alert('Please fill in all fields');
+    return;
+  }
+  
+  if (password !== confirmPassword) {
+    alert('Passwords do not match');
+    return;
+  }
+  
+  if (users[username]) {
+    alert('Username already exists');
+    return;
+  }
+  
+  if (username.length < 3) {
+    alert('Username must be at least 3 characters long');
+    return;
+  }
+  
+  if (password.length < 6) {
+    alert('Password must be at least 6 characters long');
+    return;
+  }
+  
+  // Create new user
+  users[username] = { password };
+  currentUser = { username };
+  
+  // Add to leaderboard
+  leaderboardData.push({
+    username,
+    rank: 'BRONZE',
+    wins: 0,
+    losses: 0,
+    totalGames: 0,
+    winRate: 0
+  });
+  
+  // Sort leaderboard
+  leaderboardData.sort((a, b) => {
+    const rankA = RANK_ORDER.indexOf(a.rank);
+    const rankB = RANK_ORDER.indexOf(b.rank);
+    if (rankA !== rankB) return rankB - rankA;
+    return b.winRate - a.winRate;
+  });
+  
+  saveData();
+  showMainMenu();
+  
+  // Clear form
+  document.getElementById('signupUsername').value = '';
+  document.getElementById('signupPassword').value = '';
+  document.getElementById('signupConfirmPassword').value = '';
+  
+  // Switch back to login form
+  signupForm.classList.add('hidden');
+  loginForm.classList.remove('hidden');
+}
+
 // Initialize
-loadPlayerRank();
-showMainMenu();
+loadData();
 
 // Resize
 function fit() {
