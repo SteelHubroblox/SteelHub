@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Light 'em up!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="ui">
+      <div id="title" class="accent-title">Light 'em up!</div>
+      <div id="instructions">
+        Player 1: A/D move, Space jump, Left Mouse shoot. Player 2: AI
+      </div>
+      <div id="hint">First to 3 (best-of-3 engagements) per round. 5 rounds per series. Between rounds, pick an upgrade.</div>
+      
+      <!-- Pause Button (PC) -->
+      <button id="pauseButton" class="pause-button hidden">
+        <span class="pause-icon">⏸</span>
+      </button>
+    </div>
+
+    <canvas id="game"></canvas>
+
+            <!-- Login/Signup Overlay -->
+        <div id="authOverlay" class="overlay hidden">
+          <div class="auth-container">
+            <div class="auth-header">
+              <div class="auth-title">Welcome to Light 'em up!</div>
+              <div class="auth-subtitle">Create an account or sign in to play</div>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+              <div class="form-group">
+                <label for="loginUsername">Username</label>
+                <input type="text" id="loginUsername" placeholder="Enter username" required>
+              </div>
+              <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" required>
+              </div>
+              <div class="form-actions">
+                <button id="loginBtn" class="auth-btn primary">Sign In</button>
+                <button id="showSignupBtn" class="auth-btn secondary">Create Account</button>
+              </div>
+            </div>
+            
+            <!-- Signup Form -->
+            <div id="signupForm" class="auth-form hidden">
+              <div class="form-group">
+                <label for="signupUsername">Username</label>
+                <input type="text" id="signupUsername" placeholder="Choose username" required>
+              </div>
+              <div class="form-group">
+                <label for="signupPassword">Password</label>
+                <input type="password" id="signupPassword" placeholder="Choose password" required>
+              </div>
+              <div class="form-group">
+                <label for="signupConfirmPassword">Confirm Password</label>
+                <input type="password" id="signupConfirmPassword" placeholder="Confirm password" required>
+              </div>
+              <div class="form-actions">
+                <button id="signupBtn" class="auth-btn primary">Create Account</button>
+                <button id="showLoginBtn" class="auth-btn secondary">Already have an account? Sign In</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="mainMenu" class="overlay hidden">
+          <div class="main-menu-container">
+            <div class="game-logo">
+              <div class="logo-title">Light 'em up!</div>
+              <div class="logo-subtitle">Fast 2D brawler with upgrades</div>
+            </div>
+            
+            <div class="user-info">
+              <div class="user-avatar">👤</div>
+              <div class="user-details">
+                <div class="username" id="currentUsername">Player</div>
+                <button id="mainMenuLoginBtn" class="login-btn">Login</button>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+              </div>
+            </div>
+            
+            <div class="menu-buttons">
+              <button id="playButton" class="play-button">
+                <span class="play-icon">▶</span>
+                <span class="play-text">PLAY</span>
+              </button>
+            </div>
+      
+            <div class="menu-options hidden" id="gameModeOptions">
+              <div class="mode-option" id="vsAI">
+                <div class="mode-icon">🤖</div>
+                <div class="mode-text">
+                  <div class="mode-title">VS AI</div>
+                  <div class="mode-desc">Practice against computer opponents</div>
+                </div>
+              </div>
+              
+              <div class="mode-option" id="online">
+                <div class="mode-icon">🌐</div>
+                <div class="mode-text">
+                  <div class="mode-title">ONLINE</div>
+                  <div class="mode-desc">Compete against players worldwide</div>
+                </div>
+              </div>
+            </div>
+      
+            <div class="menu-footer">
+              <div class="rank-display" id="rankDisplay">
+                <div class="rank-icon">🥉</div>
+                <div class="rank-info">
+                  <div class="rank-name">Bronze 1</div>
+                  <div class="rank-division">Division 1</div>
+                </div>
+              </div>
+              
+              <button id="leaderboardButton" class="leaderboard-btn">
+                <span class="leaderboard-icon">🏆</span>
+                <span>Leaderboard</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+    <!-- Game Settings Menu (for VS AI) -->
+    <div id="gameSettings" class="overlay hidden">
+      <div class="menu-card">
+        <div class="menu-title accent-title">Game Settings</div>
+        <div class="menu-sub">Customize your AI battle</div>
+        <div class="menu-row">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="menu-row">
+          <button id="btnBackToMain" class="secondary">Back</button>
+          <button id="startButton" class="primary">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="pauseOverlay" class="overlay hidden">
+      <div class="menu-card">
+        <div class="menu-title accent-title">Paused</div>
+        <div class="menu-row">
+          <button id="btnResume" class="primary">Resume</button>
+          <button id="btnQuit" class="primary">Quit to Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Draft Overlay -->
+    <div id="draftOverlay" class="overlay hidden">
+      <div class="draft">
+        <div class="draft-title">Pick an upgrade</div>
+        <div id="draftPlayerLabel" class="draft-sub"></div>
+        <div id="cardGrid" class="card-grid"></div>
+        <div class="draft-hint">Tap a card to select</div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Overlay -->
+    <div id="leaderboardOverlay" class="overlay hidden">
+      <div class="leaderboard-container">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title">🏆 Global Leaderboard</div>
+          <button id="closeLeaderboard" class="close-btn">×</button>
+        </div>
+        <div class="leaderboard-tabs">
+          <button class="tab-btn active" data-tab="global">Global</button>
+          <button class="tab-btn" data-tab="rankings">Rankings</button>
+        </div>
+        <div class="leaderboard-content">
+          <div id="globalLeaderboard" class="tab-content active">
+            <div class="leaderboard-list" id="globalList"></div>
+          </div>
+          <div id="rankingsLeaderboard" class="tab-content">
+            <div class="rankings-grid" id="rankingsGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobileControls" class="hidden">
+      <div class="mc-left">
+        <div id="moveStick" class="mc-stick">
+          <div id="moveKnob" class="mc-knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="debug" style="position:fixed; bottom:10px; left:10px; z-index:15; font:12px monospace; opacity:0.85;"></div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
