@@ -171,21 +171,32 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPlayerRank();
   }
 
-function logout() {
-  currentUser = null;
-  localStorage.removeItem('currentUser');
-  showAuthOverlay();
-}
+  function logout() {
+    currentUser = null;
+    localStorage.removeItem('currentUser');
+    showMainMenu(); // Changed from showAuthOverlay to showMainMenu
+  }
 
-// Load player rank from localStorage
-function loadPlayerRank() {
-  if (currentUser) {
-    // Load player rank data from localStorage
-    const savedRank = localStorage.getItem(`playerRank_${currentUser.username}`);
-    if (savedRank) {
-      playerRank = JSON.parse(savedRank);
+  // Load player rank from localStorage
+  function loadPlayerRank() {
+    if (currentUser) {
+      // Load player rank data from localStorage
+      const savedRank = localStorage.getItem(`playerRank_${currentUser.username}`);
+      if (savedRank) {
+        playerRank = JSON.parse(savedRank);
+      } else {
+        // Initialize new player at Bronze 1
+        playerRank = {
+          rank: 'BRONZE',
+          version: 1,
+          division: 1,
+          wins: 0,
+          losses: 0,
+          totalGames: 0
+        };
+      }
     } else {
-      // Initialize new player at Bronze 1
+      // Guest player - use temporary rank
       playerRank = {
         rank: 'BRONZE',
         version: 1,
@@ -195,78 +206,67 @@ function loadPlayerRank() {
         totalGames: 0
       };
     }
-  } else {
-    // Guest player - use temporary rank
-    playerRank = {
-      rank: 'BRONZE',
-      version: 1,
-      division: 1,
-      wins: 0,
-      losses: 0,
-      totalGames: 0
-    };
-  }
-  
-  updateRankDisplay();
-}
-
-// Save player rank to localStorage
-function savePlayerRank() {
-  if (currentUser) {
-    // Only save rank data for authenticated users
-    localStorage.setItem(`playerRank_${currentUser.username}`, JSON.stringify(playerRank));
-  }
-  // Guest users don't have persistent rank data
-}
-
-// Update rank display
-function updateRankDisplay() {
-  const rankData = RANKS[playerRank.rank];
-  rankIcon.textContent = rankData.icon;
-  rankName.textContent = `${rankData.name} ${playerRank.version}`;
-  
-  if (rankData.divisions > 0) {
-    rankDivision.textContent = `Division ${playerRank.division}`;
-    rankDivision.style.display = 'block';
-  } else {
-    rankDivision.style.display = 'none';
-  }
-}
-
-// Handle win/loss and rank progression
-function handleGameResult(won) {
-  if (gameMode !== 'online') return;
-  
-  if (won) {
-    playerRank.wins++;
-    playerRank.totalGames++;
     
-    // Progress division
+    updateRankDisplay();
+  }
+
+  // Save player rank to localStorage
+  function savePlayerRank() {
+    if (currentUser) {
+      // Only save rank data for authenticated users
+      localStorage.setItem(`playerRank_${currentUser.username}`, JSON.stringify(playerRank));
+    }
+    // Guest users don't have persistent rank data
+  }
+
+  // Update rank display
+  function updateRankDisplay() {
     const rankData = RANKS[playerRank.rank];
+    rankIcon.textContent = rankData.icon;
+    rankName.textContent = `${rankData.name} ${playerRank.version}`;
+    
     if (rankData.divisions > 0) {
-      playerRank.division++;
-      if (playerRank.division > rankData.divisions) {
-        playerRank.division = 1;
-        playerRank.version++;
-        if (playerRank.version > rankData.versions) {
-          // Rank up
-          const currentIndex = RANK_ORDER.indexOf(playerRank.rank);
-          if (currentIndex < RANK_ORDER.length - 1) {
-            playerRank.rank = RANK_ORDER[currentIndex + 1];
-            playerRank.version = 1;
-            playerRank.division = 1;
+      rankDivision.textContent = `Division ${playerRank.division}`;
+      rankDivision.style.display = 'block';
+    } else {
+      rankDivision.style.display = 'none';
+    }
+  }
+
+  // Handle win/loss and rank progression
+  function handleGameResult(won) {
+    if (gameMode !== 'online') return;
+    
+    if (won) {
+      playerRank.wins++;
+      playerRank.totalGames++;
+      
+      // Progress division
+      const rankData = RANKS[playerRank.rank];
+      if (rankData.divisions > 0) {
+        playerRank.division++;
+        if (playerRank.division > rankData.divisions) {
+          playerRank.division = 1;
+          playerRank.version++;
+          if (playerRank.version > rankData.versions) {
+            // Rank up
+            const currentIndex = RANK_ORDER.indexOf(playerRank.rank);
+            if (currentIndex < RANK_ORDER.length - 1) {
+              playerRank.rank = RANK_ORDER[currentIndex + 1];
+              playerRank.version = 1;
+              playerRank.division = 1;
+            }
           }
         }
+      } else {
+        // Master Gunman - no divisions, just track wins
+        playerRank.wins++;
       }
     } else {
-      // Master Gunman - no divisions, just track wins
-      playerRank.wins++;
-    }
-  } else {
-    playerRank.losses++;
-    playerRank.totalGames++;
-    
-    // Lose division
+      playerRank.losses++;
+      playerRank.totalGames++;
+      
+      // Lose division
     const rankData = RANKS[playerRank.rank];
     if (rankData.divisions > 0) {
       playerRank.division--;
@@ -297,18 +297,18 @@ function handleGameResult(won) {
 
 
 
-function showGameSettings() {
-  mainMenu.classList.add('hidden');
-  gameSettings.classList.remove('hidden');
-}
+  function showGameSettings() {
+    mainMenu.classList.add('hidden');
+    gameSettings.classList.remove('hidden');
+  }
 
-function showGameModeOptions() {
-  gameModeOptions.classList.add('show');
-}
+  function showGameModeOptions() {
+    gameModeOptions.classList.add('show');
+  }
 
-function hideGameModeOptions() {
-  gameModeOptions.classList.remove('show');
-}
+  function hideGameModeOptions() {
+    gameModeOptions.classList.remove('show');
+  }
 
 // Event Listeners
 playButton.addEventListener('click', showGameModeOptions);
@@ -462,189 +462,201 @@ logoutBtn.addEventListener('click', logout);
           signupForm.classList.add('hidden');
         });
 
-// Handle login
-function handleLogin() {
-  const username = document.getElementById('loginUsername').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  
-  if (!username || !password) {
-    alert('Please enter both username and password');
-    return;
+        // Authentication form event listeners
+        document.getElementById('loginBtn').addEventListener('click', handleLogin);
+        document.getElementById('signupBtn').addEventListener('click', handleSignup);
+        document.getElementById('showSignupBtn').addEventListener('click', () => {
+          loginForm.classList.add('hidden');
+          signupForm.classList.remove('hidden');
+        });
+        document.getElementById('showLoginBtn').addEventListener('click', () => {
+          signupForm.classList.add('hidden');
+          loginForm.classList.remove('hidden');
+        });
+
+  // Handle login
+  function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    if (!username || !password) {
+      alert('Please enter both username and password');
+      return;
+    }
+    
+    if (users[username] && users[username].password === password) {
+      currentUser = { username };
+      saveData();
+      
+      // Clear form fields
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+      
+      // Return to main menu
+      showMainMenu();
+    } else {
+      alert('Invalid username or password');
+    }
   }
-  
-  if (users[username] && users[username].password === password) {
+
+  // Handle signup
+  function handleSignup() {
+    const username = document.getElementById('signupUsername').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const confirmPassword = document.getElementById('signupConfirmPassword').value;
+    
+    if (!username || !password || !confirmPassword) {
+      alert('Please fill in all fields');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    
+    if (users[username]) {
+      alert('Username already exists');
+      return;
+    }
+    
+    if (username.length < 3) {
+      alert('Username must be at least 3 characters long');
+      return;
+    }
+    
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+    
+    // Create new user
+    users[username] = { password };
     currentUser = { username };
+    
+    // Add to leaderboard
+    leaderboardData.push({
+      username,
+      rank: 'BRONZE',
+      wins: 0,
+      losses: 0,
+      totalGames: 0,
+      winRate: 0
+    });
+    
+    // Sort leaderboard
+    leaderboardData.sort((a, b) => {
+      const rankA = RANK_ORDER.indexOf(a.rank);
+      const rankB = RANK_ORDER.indexOf(b.rank);
+      if (rankA !== rankB) return rankB - rankA;
+      return b.winRate - a.winRate;
+    });
+    
     saveData();
-    
-    // Clear form fields
-    document.getElementById('loginUsername').value = '';
-    document.getElementById('loginPassword').value = '';
-    
-    // Return to main menu
     showMainMenu();
-  } else {
-    alert('Invalid username or password');
-  }
-}
-
-// Handle signup
-function handleSignup() {
-  const username = document.getElementById('signupUsername').value.trim();
-  const password = document.getElementById('signupPassword').value;
-  const confirmPassword = document.getElementById('signupConfirmPassword').value;
-  
-  if (!username || !password || !confirmPassword) {
-    alert('Please fill in all fields');
-    return;
-  }
-  
-  if (password !== confirmPassword) {
-    alert('Passwords do not match');
-    return;
-  }
-  
-  if (users[username]) {
-    alert('Username already exists');
-    return;
-  }
-  
-  if (username.length < 3) {
-    alert('Username must be at least 3 characters long');
-    return;
-  }
-  
-  if (password.length < 6) {
-    alert('Password must be at least 6 characters long');
-    return;
-  }
-  
-  // Create new user
-  users[username] = { password };
-  currentUser = { username };
-  
-  // Add to leaderboard
-  leaderboardData.push({
-    username,
-    rank: 'BRONZE',
-    wins: 0,
-    losses: 0,
-    totalGames: 0,
-    winRate: 0
-  });
-  
-  // Sort leaderboard
-  leaderboardData.sort((a, b) => {
-    const rankA = RANK_ORDER.indexOf(a.rank);
-    const rankB = RANK_ORDER.indexOf(b.rank);
-    if (rankA !== rankB) return rankB - rankA;
-    return b.winRate - a.winRate;
-  });
-  
-  saveData();
-  showMainMenu();
-  
-  // Clear form
-  document.getElementById('signupUsername').value = '';
-  document.getElementById('signupPassword').value = '';
-  document.getElementById('signupConfirmPassword').value = '';
-  
-  // Switch back to login form
-  signupForm.classList.add('hidden');
-  loginForm.classList.remove('hidden');
-}
-
-// Initialize
-loadData();
-
-// Resize
-function fit() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', fit);
-fit();
-
-// Game constants
-const G = 1800; // gravity px/s^2
-const JUMP_V = 750;
-const MOVE_A = 3000;
-const MAX_VX = 380;
-const AIR_CTRL = 0.7;
-const FRICTION = 12;
-
-// Series config: 5 rounds total; each round is best-of-3 engagements
-const SERIES_ROUNDS_TOTAL = 5;
-const ROUND_BEST_OF = 3; // first to 2
-let seriesRoundIndex = 1;
-let roundWins = [0, 0];
-let scores = [0, 0];
-
-// Mouse aiming
-let mouseX = 0, mouseY = 0;
-window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
-
-// Input
-const keys = new Set();
-let jumpPressed = false;
-window.addEventListener('keydown', (e) => { keys.add(e.code); if (e.code === 'Space') jumpPressed = true; });
-window.addEventListener('keyup', (e) => keys.delete(e.code));
-let mouseDown = false;
-window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
-window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
-
-// World platforms (side view) with cool shapes and colors
-let platforms = [];
-function makeDefaultPlatforms() {
-  const w = canvas.width, h = canvas.height;
-  platforms = [
-    // ground - dark stone with subtle texture
-    { x: 0, y: h - 60, w: w, h: 60, type: 'ground', color: '#2a2a2a', pattern: 'stone' },
     
-    // mid platforms with different shapes and colors
-    { x: w * 0.2, y: h * 0.68, w: 220, h: 16, type: 'platform', color: '#4a7c59', pattern: 'rounded', shape: 'rounded' },
-    { x: w * 0.6, y: h * 0.56, w: 260, h: 16, type: 'platform', color: '#8b5a96', pattern: 'crystal', shape: 'crystal' },
-    { x: w * 0.15, y: h * 0.44, w: 180, h: 16, type: 'platform', color: '#d4a574', pattern: 'wood', shape: 'wood' },
-    { x: w * 0.55, y: h * 0.34, w: 220, h: 16, type: 'platform', color: '#6b8e23', pattern: 'grass', shape: 'grass' },
+    // Clear form
+    document.getElementById('signupUsername').value = '';
+    document.getElementById('signupPassword').value = '';
+    document.getElementById('signupConfirmPassword').value = '';
     
-    // floating platforms
-    { x: w * 0.35, y: h * 0.25, w: 140, h: 12, type: 'platform', color: '#4682b4', pattern: 'ice', shape: 'ice' },
-    { x: w * 0.75, y: h * 0.18, w: 160, h: 14, type: 'platform', color: '#daa520', pattern: 'gold', shape: 'gold' },
-  ];
-}
-makeDefaultPlatforms();
+    // Switch back to login form
+    signupForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+    }
 
-// Utils
-function rectsIntersect(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-function randRange(a, b) { return a + Math.random() * (b - a); }
-
-// Player with levels map
-class Player {
-  constructor(idx, color, controls) {
-    this.idx = idx;
-    this.color = color;
-    this.controls = controls;
-    this.w = 40; this.h = 56;
-    this.levels = {}; // id -> level (1..4)
-    this.reset();
+  // Initialize
+  loadData();
+  
+  // Resize
+  function fit() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
-  reset(spawnX, spawnY) {
-    this.x = spawnX ?? (this.idx === 0 ? canvas.width * 0.18 : canvas.width * 0.82);
-    this.y = spawnY ?? (canvas.height - 60 - this.h);
-    this.vx = 0; this.vy = 0;
-    this.onGround = false;
-    this.maxHp = this.maxHp || 100;
-    this.hp = this.maxHp;
-    this.reload = 0;
-    this.facing = this.idx === 0 ? 1 : -1;
-    this.bulletSpeed = 650;
-    this.bulletDmg = 18;
-    this.fireDelay = 0.35;
-    this.knockback = 220;
-    this.jumpBoost = 0;
-    this.moveBoost = 0;
+  window.addEventListener('resize', fit);
+  fit();
+
+  // Game constants
+  const G = 1800; // gravity px/s^2
+  const JUMP_V = 750;
+  const MOVE_A = 3000;
+  const MAX_VX = 380;
+  const AIR_CTRL = 0.7;
+  const FRICTION = 12;
+
+  // Series config: 5 rounds total; each round is best-of-3 engagements
+  const SERIES_ROUNDS_TOTAL = 5;
+  const ROUND_BEST_OF = 3; // first to 2
+  let seriesRoundIndex = 1;
+  let roundWins = [0, 0];
+  let scores = [0, 0];
+
+  // Mouse aiming
+  let mouseX = 0, mouseY = 0;
+  window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+
+  // Input
+  const keys = new Set();
+  let jumpPressed = false;
+  window.addEventListener('keydown', (e) => { keys.add(e.code); if (e.code === 'Space') jumpPressed = true; });
+  window.addEventListener('keyup', (e) => keys.delete(e.code));
+  let mouseDown = false;
+  window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
+  window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
+
+  // World platforms (side view) with cool shapes and colors
+  let platforms = [];
+  function makeDefaultPlatforms() {
+    const w = canvas.width, h = canvas.height;
+    platforms = [
+      // ground - dark stone with subtle texture
+      { x: 0, y: h - 60, w: w, h: 60, type: 'ground', color: '#2a2a2a', pattern: 'stone' },
+      
+      // mid platforms with different shapes and colors
+      { x: w * 0.2, y: h * 0.68, w: 220, h: 16, type: 'platform', color: '#4a7c59', pattern: 'rounded', shape: 'rounded' },
+      { x: w * 0.6, y: h * 0.56, w: 260, h: 16, type: 'platform', color: '#8b5a96', pattern: 'crystal', shape: 'crystal' },
+      { x: w * 0.15, y: h * 0.44, w: 180, h: 16, type: 'platform', color: '#d4a574', pattern: 'wood', shape: 'wood' },
+      { x: w * 0.55, y: h * 0.34, w: 220, h: 16, type: 'platform', color: '#6b8e23', pattern: 'grass', shape: 'grass' },
+      
+      // floating platforms
+      { x: w * 0.35, y: h * 0.25, w: 140, h: 12, type: 'platform', color: '#4682b4', pattern: 'ice', shape: 'ice' },
+      { x: w * 0.75, y: h * 0.18, w: 160, h: 14, type: 'platform', color: '#daa520', pattern: 'gold', shape: 'gold' },
+    ];
+  }
+  makeDefaultPlatforms();
+
+  // Utils
+  function rectsIntersect(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function randRange(a, b) { return a + Math.random() * (b - a); }
+
+  // Player with levels map
+  class Player {
+    constructor(idx, color, controls) {
+      this.idx = idx;
+      this.color = color;
+      this.controls = controls;
+      this.w = 40; this.h = 56;
+      this.levels = {}; // id -> level (1..4)
+      this.reset();
+    }
+    reset(spawnX, spawnY) {
+      this.x = spawnX ?? (this.idx === 0 ? canvas.width * 0.18 : canvas.width * 0.82);
+      this.y = spawnY ?? (canvas.height - 60 - this.h);
+      this.vx = 0; this.vy = 0;
+      this.onGround = false;
+      this.maxHp = this.maxHp || 100;
+      this.hp = this.maxHp;
+      this.reload = 0;
+      this.facing = this.idx === 0 ? 1 : -1;
+      this.bulletSpeed = 650;
+      this.bulletDmg = 18;
+      this.fireDelay = 0.35;
+      this.knockback = 220;
+      this.jumpBoost = 0;
+      this.moveBoost = 0;
     this.maxJumps = 1;
     this.jumpsUsed = 0;
     this.pierceLevel = 0;
