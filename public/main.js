@@ -208,7 +208,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Handle win/loss and rank progression
   function handleGameResult(won) {
-    if (gameMode !== 'online') return;
+    if (gameMode === 'online') {
+      rewardCoinsOnline(won);
+    }
     
     if (won) {
       playerRank.wins++;
@@ -897,14 +899,15 @@ class Bullet {
 // Leveled abilities (up to 4)
 const MAX_LEVEL = 4;
 
-const RARITY = { Common: 'Common', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary' };
+const RARITY = { Common: 'Common', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary', Secret: 'Secret' };
 const RARITY_WEIGHTS = [
-  { r: RARITY.Common, w: 0.6 },
-  { r: RARITY.Rare, w: 0.28 },
-  { r: RARITY.Epic, w: 0.1 },
-  { r: RARITY.Legendary, w: 0.02 },
+  { r: RARITY.Common, w: 0.70 },
+  { r: RARITY.Rare, w: 0.20 },
+  { r: RARITY.Epic, w: 0.08 },
+  { r: RARITY.Legendary, w: 0.015 },
+  { r: RARITY.Secret, w: 0.005 },
 ];
-const RARITY_COLOR = { Common: '#9aa6b2', Rare: '#53b3f3', Epic: '#c77dff', Legendary: '#ffd166' };
+const RARITY_COLOR = { Common: '#9aa6b2', Rare: '#53b3f3', Epic: '#c77dff', Legendary: '#ffd166', Secret: '#ff6bd6' };
 
   function weightedRarity() {
     const x = Math.random();
@@ -936,11 +939,12 @@ const ALL_CARDS = [
 ];
 
   function generateDraftPool(forPlayer) {
+    const available = getDraftableCards();
     const pool = [];
     const used = new Set();
     for (let i = 0; i < 3; i++) {
       const rarity = weightedRarity();
-      const candidates = ALL_CARDS.filter(c => c.rarity === rarity && !used.has(c.id))
+      const candidates = available.filter(c => c.rarity === rarity && !used.has(c.id))
         .filter(c => (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
       if (candidates.length === 0) continue;
       const pick = candidates[Math.floor(Math.random() * candidates.length)];
@@ -948,11 +952,11 @@ const ALL_CARDS = [
       const nextLevel = (forPlayer.levels[pick.id] || 0) + 1;
       pool.push({ card: pick, nextLevel });
     }
-    // If pool underfilled, backfill with any rarity
+    // If pool underfilled, backfill with any remaining
     while (pool.length < 3) {
-      const rem = ALL_CARDS.filter(c => !pool.find(p => p.card.id === c.id) && (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
+      const rem = available.filter(c => !pool.find(p => p.card.id === c.id) && (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
       if (!rem.length) break;
-      const pick = rem[Math.floor(Math.random() * candidates.length)];
+      const pick = rem[Math.floor(Math.random() * rem.length)];
       pool.push({ card: pick, nextLevel: (forPlayer.levels[pick.id] || 0) + 1 });
     }
     return pool;
@@ -1202,48 +1206,68 @@ const ALL_CARDS = [
     const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step; const top4 = top3 - step;
     const ph = 18;
     // Ground
-    platforms.push({ x: 0, y: groundY, w, h: 60, active: true });
+    platforms.push({ x: 0, y: groundY, w, h: 60, active: true, type:'ground' });
     if (idx === 0) {
-      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
       addMovingPlat(w * 0.62, top1 - 10, 240, ph, 120, 0, 0.8);
-      platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true });
+      platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true, shape:'rounded' });
       addCrumblePlat(w * 0.55, top2 - 10, 220, ph, 0.6, 3);
-      platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true });
+      platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true, shape:'rounded' });
       addSpikeRow(0, groundY - 16, 120, 16);
       addSpikeRow(w - 120, groundY - 16, 120, 16);
     } else if (idx === 1) {
-      platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true });
+      platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true, shape:'grass' });
       addMovingPlat(w * 0.18, top2 + 10, 240, 14, 140, 0, 1.2);
-      platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true });
+      platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true, shape:'wood' });
       addCrumblePlat(w * 0.38, top3 + 10, 220, 14, 0.5, 2.5);
       addSpikeRow(w * 0.4, groundY - 16, w * 0.2, 16);
     } else if (idx === 2) {
-      platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true, shape:'crystal' });
       addMovingPlat(w * 0.12, top2, 200, ph, 0, 80, 0.9);
-      platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true });
-      platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true, shape:'ice' });
+      platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true, shape:'gold' });
       addCrumblePlat(w * 0.68, top2, 220, ph, 0.7, 2.8);
       addMovingPlat(w * 0.68, top3, 200, ph, 0, 90, 1.0);
-      platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true });
+      platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true, shape:'rounded' });
       addSpikeRow(w * 0.48, groundY - 16, 100, 16);
-    } else {
-      platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true });
+    } else if (idx === 3) {
+      platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true, shape:'rounded' });
       addCrumblePlat(w * 0.16, top2 + 10, 260, ph, 0.6, 2.6);
-      platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true, shape:'wood' });
       addMovingPlat(w * 0.66, top1, 240, ph, 140, 0, 0.8);
-      platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true });
-      addMovingPlat(w * 0.58, top3, 360, ph, 160, 0, 0.6);
-      addSpikeRow(w * 0.45, groundY - 16, w * 0.1, 16);
+      platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true, shape:'grass' });
+    } else if (idx === 4) {
+      // New: pyramid-style steps
+      platforms.push({ x: w*0.1, y: top3, w: 140, h: ph, active:true, shape:'gold' });
+      platforms.push({ x: w*0.25, y: top2, w: 200, h: ph, active:true, shape:'gold' });
+      platforms.push({ x: w*0.45, y: top1, w: 260, h: ph, active:true, shape:'gold' });
+      addMovingPlat(w*0.7, top2, 220, ph, 0, 80, 0.9);
+      addSpikeRow(w*0.0, groundY-16, w*0.4, 16);
+      addSpikeRow(w*0.6, groundY-16, w*0.4, 16);
+    } else if (idx === 5) {
+      // New: floating islands with rounded and crystal
+      platforms.push({ x: w*0.15, y: top1-20, w: 220, h: ph, active:true, shape:'rounded' });
+      platforms.push({ x: w*0.45, y: top2-10, w: 200, h: ph, active:true, shape:'crystal' });
+      platforms.push({ x: w*0.72, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
+      addMovingPlat(w*0.3, top3, 180, ph, 120, 0, 0.7);
+      addCrumblePlat(w*0.65, top1, 180, ph, 0.5, 2.0);
+    } else {
+      // Fallback mirrors first layout
+      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
+      platforms.push({ x: w * 0.55, y: top2 - 10, w: 220, h: ph, active: true, shape:'rounded' });
     }
     setupParallax();
   }
+
+  // When rotating arenas per engagement, account for new total
+  const ARENA_COUNT = 6;
 
   function doStartMatch() {
     state = 'playing';
     bullets = [];
     particles.length = 0;
     buildArena(currentArena);
-    currentArena = (currentArena + 1) % 4; // rotate arenas each engagement
+    currentArena = (currentArena + 1) % ARENA_COUNT; // rotate arenas each engagement
     players[0].reset(); players[1].reset();
     players[0].applyCards(); players[1].applyCards();
     
@@ -1324,6 +1348,7 @@ const ALL_CARDS = [
             // Handle AI game result
             const playerWon = winnerIdx === 0;
             handleGameResult(playerWon);
+            try { const diff = document.getElementById('difficulty')?.value || 'normal'; rewardCoinsAI(diff, playerWon); } catch {}
           }
           
           // Show main menu
@@ -1581,7 +1606,13 @@ let isMobile = false;
     const touchCapable = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
     isMobile = touchCapable;
     mobileControls.classList.toggle('show', isMobile);
+    mobileControls.classList.toggle('hidden', !isMobile);
+    return isMobile;
   }
+  // Call on load and on viewport changes
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+  window.addEventListener('orientationchange', checkMobile);
 
 let mobileMoveLeft = false, mobileMoveRight = false; let mobileShootTap = null; // {x,y} when tapped
 let aimVec = { x: 1, y: 0 };
@@ -1864,19 +1895,37 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
 
   // Drawing polish: player head
   function drawPlayer(p) {
+    // cosmetics
+    const eq = _equipped();
+    // trail
+    if (eq.trail === 'trail_fire') { trails.push({ x: p.x + p.w/2, y: p.y + p.h, life: 0.25, color: 'rgba(255,120,40,0.8)' }); }
     // hp bar
     ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 25, p.w + 4, 6, 3); ctx.fill();
     ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 25, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; drawRoundedRect(Math.floor(p.x)+2, Math.floor(p.y)+6, p.w, p.h, 12); ctx.fill();
+    // skin tint
+    let bodyColor = p.color; if (eq.skin === 'skin_red') bodyColor = '#ff6b6b';
     // body with black border
-    ctx.fillStyle = p.color; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.fill();
+    ctx.fillStyle = bodyColor; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.fill();
     ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.stroke();
     // head with black border
-    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.stroke();
     // eye
     ctx.fillStyle = '#0b1020'; ctx.beginPath(); ctx.arc(p.x + p.w/2 + (p.facing>0?4:-4), p.y - 12, 2, 0, Math.PI*2); ctx.fill();
+    // hat
+    if (eq.hat === 'hat_crown') {
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath();
+      const cx = p.x + p.w/2, cy = p.y - 22; const w = 20, h = 10;
+      ctx.moveTo(cx - w/2, cy + h);
+      ctx.lineTo(cx - w/4, cy);
+      ctx.lineTo(cx, cy + h);
+      ctx.lineTo(cx + w/4, cy);
+      ctx.lineTo(cx + w/2, cy + h);
+      ctx.closePath(); ctx.fill(); ctx.strokeStyle='#000'; ctx.stroke();
+    }
     // shield outline
     if (p.shieldCharges && p.shieldCharges>0) { ctx.strokeStyle = '#9ad7ff'; ctx.lineWidth = 2; drawRoundedRect(Math.floor(p.x)-3, Math.floor(p.y)-3, p.w+6, p.h+6, 14); ctx.stroke(); }
     // gun
@@ -2338,3 +2387,202 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
   loop();
   
 }); // End of DOMContentLoaded event listener
+
+// Economy & Shop minimal integration
+let coins = parseInt(localStorage.getItem('coins') || '0', 10);
+function addCoins(amount) { coins = Math.max(0, coins + amount); localStorage.setItem('coins', String(coins)); if (document.getElementById('coinsLabel')) document.getElementById('coinsLabel').textContent = String(coins); }
+
+// Inject Shop button into main menu footer
+(function ensureShopButton(){
+  const footer = document.querySelector('.menu-footer');
+  if (!footer) return;
+  if (!document.getElementById('openShopBtn')) {
+    const btn = document.createElement('button'); btn.id = 'openShopBtn'; btn.className = 'leaderboard-btn'; btn.innerHTML = '<span class="leaderboard-icon">🛒</span><span>Shop</span>';
+    footer.appendChild(btn);
+    btn.addEventListener('click', () => { openShop(); });
+  }
+})();
+
+function openShop() {
+  let overlay = document.getElementById('shopOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div'); overlay.id = 'shopOverlay'; overlay.className = 'overlay';
+    overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Shop</div><div>Coins: <span id="coinsLabel"></span></div><div class="menu-sub" style="margin-top:10px;">Customizations</div><div id="cosmetics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div class="menu-sub">Ability Packs</div><div id="packs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeShop" class="primary">Close</button></div></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#closeShop').onclick = () => overlay.remove();
+  }
+  // Render coins
+  document.getElementById('coinsLabel').textContent = String(coins);
+  // Simple cosmetics list
+  const cosmetics = [{id:'skin_red',name:'Red Skin'},{id:'hat_crown',name:'Crown'},{id:'trail_fire',name:'Fire Trail'}];
+  const grid = document.getElementById('cosmetics'); grid.innerHTML='';
+  const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
+  for (const c of cosmetics){ const el=document.createElement('div'); el.className='card'; const o=owned.has(c.id); el.innerHTML=`<div class="card-title">${c.name}</div><div class="card-desc">150 coins</div><button class="primary" ${o?'disabled':''}>${o?'Owned':'Buy'}</button>`; el.querySelector('button').onclick=()=>{ if(o||coins<150)return; owned.add(c.id); localStorage.setItem('unlockedCosmetics',JSON.stringify([...owned])); addCoins(-150); openShop(); }; grid.appendChild(el);} 
+  // Ability pack placeholders by rarity and price
+  const packs = document.getElementById('packs'); packs.innerHTML='';
+  const rarities = [{r:RARITY.Common,p:200},{r:RARITY.Rare,p:350},{r:RARITY.Epic,p:500},{r:RARITY.Legendary,p:700},{r:RARITY.Secret,p:1000}];
+  const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities')||'[]'));
+  for (const it of rarities){ const el=document.createElement('div'); el.className='card'; el.innerHTML=`<div class="card-title" style="color:${RARITY_COLOR[it.r]}">${it.r} Ability</div><div class="card-desc">${it.p} coins</div><button class="primary">Buy</button>`; el.querySelector('button').onclick=()=>{ if(coins<it.p)return; const pool=(NEW_ABILITIES||[]).filter(a=>a.rarity===it.r && !unlocked.has(a.id)); if(!pool.length)return; const pick=pool[Math.floor(Math.random()*pool.length)]; unlocked.add(pick.id); localStorage.setItem('unlockedAbilities',JSON.stringify([...unlocked])); addCoins(-it.p); openShop(); }; packs.appendChild(el);} 
+}
+
+// Reward coins integration helpers
+function rewardCoinsOnline(won){ addCoins(won?20:10); }
+function rewardCoinsAI(label, won){ if(!won)return; const map={easy:4,normal:7,hard:10}; addCoins(map[label]||0); }
+
+// Ensure base abilities snapshot for unlock filtering
+const ALL_CARDS_BASE = [...ALL_CARDS];
+
+// Additional abilities offered via Shop (unlocked to appear in drafts)
+const NEW_ABILITIES = [
+  { id: 'dash', title: 'Dash', desc: 'Quick burst of speed on ground and air', rarity: RARITY.Rare, icon: '💨' },
+  { id: 'walljump', title: 'Wall Jump', desc: 'Jump off walls for extra mobility', rarity: RARITY.Epic, icon: '🧱' },
+  { id: 'homing', title: 'Homing Bullets', desc: 'Bullets slightly home in on foes', rarity: RARITY.Epic, icon: '🧲' },
+  { id: 'pierce', title: 'Piercing Rounds', desc: 'Bullets pierce enemies', rarity: RARITY.Legendary, icon: '🗡️' },
+  { id: 'blink', title: 'Blink', desc: 'Short-range teleport with cooldown', rarity: RARITY.Legendary, icon: '🌀' },
+  { id: 'thorns', title: 'Thorns', desc: 'Return a portion of damage to attacker', rarity: RARITY.Rare, icon: '🌵' },
+  { id: 'phase', title: 'Phase Shift', desc: 'Brief invulnerability window', rarity: RARITY.Secret, icon: '🛡️' },
+  { id: 'arc', title: 'Arc Shot', desc: 'Bullets arc with gravity for curved shots', rarity: RARITY.Common, icon: '〽️' },
+  { id: 'splash', title: 'Splash Damage', desc: 'Small AoE on bullet impact', rarity: RARITY.Rare, icon: '💥' },
+  { id: 'slow', title: 'Cryo Rounds', desc: 'Hits slow enemy movement briefly', rarity: RARITY.Epic, icon: '❄️' },
+];
+
+// Draftable abilities are base + unlocked new abilities
+function getDraftableCards() {
+  const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities') || '[]'));
+  return [...ALL_CARDS_BASE, ...NEW_ABILITIES.filter(a => unlocked.has(a.id))];
+}
+
+// Customization overlay with equip/persist
+(function initCustomization(){
+  const btnId = 'openCustomizeBtn';
+  const footer = document.querySelector('.menu-footer');
+  if (footer && !document.getElementById(btnId)) {
+    const b = document.createElement('button'); b.id = btnId; b.className = 'leaderboard-btn'; b.innerHTML = '<span class="leaderboard-icon">🎨</span><span>Customize</span>';
+    footer.appendChild(b);
+    b.onclick = openCustomization;
+  }
+  function openCustomization(){
+    let overlay = document.getElementById('customizeOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id='customizeOverlay'; overlay.className='overlay';
+      overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Customization</div><div class="menu-sub">Select cosmetic options you have unlocked in the Shop.</div><div id="custGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeCust" class="primary">Close</button></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#closeCust').onclick = () => overlay.remove();
+    }
+    const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
+    const equipped = JSON.parse(localStorage.getItem('equippedCosmetics')||'{}');
+    const OPTIONS = [
+      { id:'skin_red', name:'Red Skin', slot:'skin' },
+      { id:'hat_crown', name:'Crown', slot:'hat' },
+      { id:'trail_fire', name:'Fire Trail', slot:'trail' },
+    ];
+    const grid = overlay.querySelector('#custGrid'); grid.innerHTML='';
+    for (const c of OPTIONS){
+      const el = document.createElement('div'); el.className='card';
+      const have = owned.has(c.id); const isEq = equipped[c.slot] === c.id;
+      el.innerHTML = `<div class="card-title">${c.name}</div><div class="card-desc">${have? 'Owned' : 'Locked (buy in Shop)'}</div><button class="primary" ${!have? 'disabled':''}>${isEq? 'Equipped' : 'Equip'}</button>`;
+      el.querySelector('button').onclick = ()=>{ if(!have) return; equipped[c.slot]=c.id; localStorage.setItem('equippedCosmetics', JSON.stringify(equipped)); openCustomization(); };
+      grid.appendChild(el);
+    }
+  }
+})();
+
+// Apply customization in drawPlayer
+const _equipped = ()=>JSON.parse(localStorage.getItem('equippedCosmetics')||'{}');
+const _owned = ()=>new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
+
+// Ability bar & cooldowns
+const ABILITY_KEYS = ['KeyQ','KeyW','KeyE','KeyR','KeyA','KeyS','KeyD','KeyF','KeyZ','KeyX'];
+const ABILITY_LABELS = ['Q','W','E','R','A','S','D','F','Z','X'];
+let abilityCooldowns = {}; // id -> seconds remaining
+
+function ensureAbilityBar(){
+  if (document.getElementById('abilityBar')) return;
+  const bar = document.createElement('div'); bar.id='abilityBar'; document.body.appendChild(bar);
+  for (let i=0;i<10;i++){ const b=document.createElement('div'); b.className='ability-btn disabled'; b.innerHTML = '<span class="icon"></span><span class="key">'+ABILITY_LABELS[i]+'</span><div class="cooldown"></div>'; bar.appendChild(b);}  
+}
+ensureAbilityBar();
+
+function setAbilityButtons(player){
+  const bar = document.getElementById('abilityBar'); if (!bar) return;
+  const buttons = [...bar.children];
+  // Collect actives from owned abilities
+  const actives = getOwnedActives(player);
+  for (let i=0;i<buttons.length;i++){
+    const btn = buttons[i]; const icon = btn.querySelector('.icon'); const cd = btn.querySelector('.cooldown');
+    const ab = actives[i];
+    if (!ab){ btn.classList.add('disabled'); icon.textContent=''; cd.style.height='0%'; continue; }
+    btn.classList.remove('disabled'); icon.textContent = ab.icon || '•';
+    const remain = Math.max(0, abilityCooldowns[ab.id] || 0);
+    const ratio = ab.cooldown ? Math.min(1, remain/ab.cooldown) : 0;
+    cd.style.height = (ratio*100)+'%';
+  }
+}
+
+function tickAbilityCooldowns(dt){
+  for (const k of Object.keys(abilityCooldowns)) abilityCooldowns[k] = Math.max(0, abilityCooldowns[k]-dt);
+}
+
+function getOwnedActives(player){
+  // Map levels to cards, filter actives from ALL_CARDS_BASE + NEW_ABILITIES that the player owns (level>0 or passive not required)
+  const all = getDraftableCards();
+  const ownedIds = new Set(Object.keys(player.levels));
+  const actives = [];
+  for (const c of all){ if (isActive(c.id) && ownedIds.has(c.id)) actives.push(normalizeActiveDef(c)); }
+  // Pad or slice to 10
+  return actives.slice(0,10);
+}
+
+function isActive(id){
+  // Registry of actives by id
+  const activeIds = new Set(['blink','dash','decoy','grapple','smoke','barrier','timedilation','shockwave','stasis','cloak','overdrive','phase','tkpush']);
+  return activeIds.has(id);
+}
+
+function normalizeActiveDef(card){
+  const cdById = { blink:6, dash:3, decoy:8, grapple:6, smoke:7, barrier:8, timedilation:12, shockwave:10, stasis:9, cloak:12, overdrive:12, phase:10, tkpush:8 };
+  return { id: card.id, icon: card.icon || '•', cooldown: cdById[card.id] || 8 };
+}
+
+// Input for actives
+window.addEventListener('keydown', (e)=>{
+  const idx = ABILITY_KEYS.indexOf(e.code); if (idx === -1) return;
+  const p = players[0]; // local player
+  const actives = getOwnedActives(p); const ab = actives[idx]; if (!ab) return;
+  if ((abilityCooldowns[ab.id]||0) > 0) return;
+  // Activate
+  if (activateAbility(p, ab.id)) abilityCooldowns[ab.id] = normalizeActiveDef({id:ab.id}).cooldown;
+});
+
+function activateAbility(p, id){
+  // Minimal safe handlers; full logic can be expanded
+  if (id==='dash'){ const power=380; p.vx += p.facing * power; return true; }
+  if (id==='blink'){ // safety check teleport
+    const dist = 160; const nx = p.x + p.facing*dist; if (!collidesAABB({x:nx,y:p.y,w:p.w,h:p.h})) { p.x = nx; return true; } return false;
+  }
+  if (id==='phase'){ p.invuln = 0.6; return true; }
+  if (id==='smoke'){ spawnSmoke(p.x+p.w/2, p.y+p.h*0.4); return true; }
+  if (id==='decoy'){ spawnDecoy(p.x, p.y); return true; }
+  if (id==='shockwave'){ spawnShockwave(p.x+p.w/2, p.y+p.h); return true; }
+  if (id==='barrier'){ spawnBarrier(p.x + p.facing*40, p.y+p.h*0.2); return true; }
+  if (id==='grapple'){ startGrapple(p); return true; }
+  if (id==='timedilation'){ p.timeDilation = 3; return true; }
+  if (id==='stasis'){ spawnStasis(p.x + p.facing*80, p.y); return true; }
+  if (id==='cloak'){ p.cloak = 2.5; return true; }
+  if (id==='overdrive'){ p.overdrive = 3; return true; }
+  if (id==='tkpush'){ doTKPush(p); return true; }
+  return false;
+}
+
+// Helpers to avoid compile errors (stubs)
+function collidesAABB(r){ return false; }
+function spawnSmoke(x,y){}
+function spawnDecoy(x,y){}
+function spawnShockwave(x,y){}
+function spawnBarrier(x,y){}
+function startGrapple(p){}
+function spawnStasis(x,y){}
+function doTKPush(p){}
+
+// Update loop integration (call in draw/update as appropriate)
+// tickAbilityCooldowns(dt); setAbilityButtons(players[0]);
