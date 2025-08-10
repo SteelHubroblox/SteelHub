@@ -764,3 +764,45 @@ canvas {
   #mobileControls.hidden { display: none; }
   #mobileControls.show { display: block; }
 }
+
+/* Online Multiplayer Styles */
+.online-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #69f0ae;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 50;
+}
+
+.online-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  background: #69f0ae;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.matchmaking-status {
+  text-align: center;
+  margin: 20px 0;
+  font-size: 16px;
+  color: #69f0ae;
+  font-weight: bold;
+}

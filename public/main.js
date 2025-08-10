@@ -339,17 +339,8 @@ document.addEventListener('DOMContentLoaded', function() {
     gameMode = 'online';
     hideGameModeOptions();
     
-    // Start online game (for now, just start with AI but track as online)
-    state = 'playing';
-    bullets = [];
-    particles.length = 0;
-    buildArena(currentArena);
-    currentArena = (currentArena + 1) % 4;
-    players[0].reset(); players[1].reset();
-    players[0].applyCards(); players[1].applyCards();
-    
-    // Hide the main menu
-    mainMenu.classList.add('hidden');
+    // Start online matchmaking
+    startOnlineMatchmaking();
   });
 
   btnBackToMain.addEventListener('click', showMainMenu);
@@ -462,7 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('loginUsername').value = '';
       document.getElementById('loginPassword').value = '';
       
-      // Return to main menu
+      // Hide auth overlay and return to main menu
+      hideAuthOverlay();
       showMainMenu();
     } else {
       alert('Invalid username or password');
@@ -523,17 +515,187 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     saveData();
-    showMainMenu();
     
     // Clear form
     document.getElementById('signupUsername').value = '';
     document.getElementById('signupPassword').value = '';
     document.getElementById('signupConfirmPassword').value = '';
     
-    // Switch back to login form
-    signupForm.classList.add('hidden');
-    loginForm.classList.remove('hidden');
+    // Hide auth overlay and return to main menu
+    hideAuthOverlay();
+    showMainMenu();
     }
+
+  // Online Multiplayer Functions
+  function startOnlineMatchmaking() {
+    if (!currentUser) {
+      alert('Please log in to play online');
+      return;
+    }
+    
+    isOnline = true;
+    state = 'matchmaking';
+    
+    // Show matchmaking screen
+    mainMenu.classList.add('hidden');
+    showMatchmakingScreen();
+    
+    // Simulate finding a match (in a real implementation, this would connect to a server)
+    setTimeout(() => {
+      findOnlineMatch();
+    }, 2000);
+  }
+  
+  function showMatchmakingScreen() {
+    // Create matchmaking overlay if it doesn't exist
+    let matchmakingOverlay = document.getElementById('matchmakingOverlay');
+    if (!matchmakingOverlay) {
+      matchmakingOverlay = document.createElement('div');
+      matchmakingOverlay.id = 'matchmakingOverlay';
+      matchmakingOverlay.className = 'overlay';
+      matchmakingOverlay.innerHTML = `
+        <div class="menu-card">
+          <div class="menu-title accent-title">Finding Match...</div>
+          <div class="menu-sub">Searching for opponents</div>
+          <div class="matchmaking-status">Connecting to server...</div>
+          <div class="menu-row">
+            <button id="btnCancelMatchmaking" class="secondary">Cancel</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(matchmakingOverlay);
+      
+      // Add cancel button event listener
+      document.getElementById('btnCancelMatchmaking').addEventListener('click', () => {
+        cancelMatchmaking();
+      });
+    }
+    
+    matchmakingOverlay.classList.remove('hidden');
+  }
+  
+  function findOnlineMatch() {
+    // Simulate finding a match
+    const matchmakingOverlay = document.getElementById('matchmakingOverlay');
+    if (matchmakingOverlay) {
+      const status = matchmakingOverlay.querySelector('.matchmaking-status');
+      status.textContent = 'Match found! Starting game...';
+      
+      setTimeout(() => {
+        startOnlineGame();
+      }, 1500);
+    }
+  }
+  
+  function startOnlineGame() {
+    // Hide matchmaking screen
+    const matchmakingOverlay = document.getElementById('matchmakingOverlay');
+    if (matchmakingOverlay) {
+      matchmakingOverlay.classList.add('hidden');
+    }
+    
+    // Create online opponent (simulated for now)
+    const onlineOpponent = new Player(1, '#ff8a80', { ai: false, online: true });
+    onlineOpponent.username = 'OnlinePlayer_' + Math.floor(Math.random() * 1000);
+    
+    // Replace AI player with online player
+    players[1] = onlineOpponent;
+    
+    // Start the game
+    state = 'playing';
+    bullets = [];
+    particles.length = 0;
+    buildArena(currentArena);
+    currentArena = (currentArena + 1) % 4;
+    players[0].reset(); 
+    players[1].reset();
+    players[0].applyCards(); 
+    players[1].applyCards();
+    
+    // Hide the main menu
+    mainMenu.classList.add('hidden');
+    
+    // Show online indicator
+    showOnlineIndicator();
+  }
+  
+  function showOnlineIndicator() {
+    // Create online indicator if it doesn't exist
+    let onlineIndicator = document.getElementById('onlineIndicator');
+    if (!onlineIndicator) {
+      onlineIndicator = document.createElement('div');
+      onlineIndicator.id = 'onlineIndicator';
+      onlineIndicator.className = 'online-indicator';
+      onlineIndicator.innerHTML = `
+        <div class="online-status">
+          <span class="online-dot"></span>
+          Online Match
+        </div>
+      `;
+      document.body.appendChild(onlineIndicator);
+    }
+    
+    onlineIndicator.classList.remove('hidden');
+  }
+  
+  function cancelMatchmaking() {
+    isOnline = false;
+    state = 'menu';
+    
+    // Hide matchmaking screen
+    const matchmakingOverlay = document.getElementById('matchmakingOverlay');
+    if (matchmakingOverlay) {
+      matchmakingOverlay.classList.add('hidden');
+    }
+    
+    // Return to main menu
+    showMainMenu();
+  }
+  
+  function handleOnlineGameResult(won) {
+    if (isOnline && currentUser) {
+      // Update player stats for online games
+      if (won) {
+        playerRank.wins++;
+        // Update rank progression (simplified)
+        if (playerRank.division < 3) {
+          playerRank.division++;
+        } else if (playerRank.version < 3) {
+          playerRank.version++;
+          playerRank.division = 1;
+        } else if (playerRank.rank !== 'MASTER') {
+          const currentRankIndex = RANK_ORDER.indexOf(playerRank.rank);
+          if (currentRankIndex < RANK_ORDER.length - 1) {
+            playerRank.rank = RANK_ORDER[currentRankIndex + 1];
+            playerRank.version = 1;
+            playerRank.division = 1;
+          }
+        }
+      } else {
+        playerRank.losses++;
+        // Update rank regression (simplified)
+        if (playerRank.division > 1) {
+          playerRank.division--;
+        } else if (playerRank.version > 1) {
+          playerRank.version--;
+          playerRank.division = 3;
+        } else if (playerRank.rank !== 'BRONZE') {
+          const currentRankIndex = RANK_ORDER.indexOf(playerRank.rank);
+          if (currentRankIndex > 0) {
+            playerRank.rank = RANK_ORDER[currentRankIndex - 1];
+            playerRank.version = 3;
+            playerRank.division = 3;
+          }
+        }
+      }
+      
+      playerRank.totalGames++;
+      playerRank.winRate = Math.round((playerRank.wins / playerRank.totalGames) * 100);
+      
+      savePlayerRank();
+      updateRankDisplay();
+    }
+  }
 
   // Initialize
   loadData();
@@ -1106,25 +1268,38 @@ const ALL_CARDS = [
     if (roundWins[winnerIdx] >= need) {
       scores[winnerIdx]++;
       roundWins = [0, 0];
-      // Between rounds: draft unless series is over
-      if (seriesRoundIndex >= SERIES_ROUNDS_TOTAL) {
-        // Series end
-        if (gameMode === 'online') {
-          // Handle ranking for online mode
-          const playerWon = winnerIdx === 0;
-          handleGameResult(playerWon);
-        }
-        
-        // Show main menu
-        showMainMenu();
-        const msg = scores[0] === scores[1] ? 'Series tied! Play again' : `P${scores[0] > scores[1] ? 1 : 2} wins the series!`;
-        
-        // Reset series
-        scores = [0, 0];
-        seriesRoundIndex = 1;
-        players.forEach(p => { p.levels = {}; p.applyCards(); });
-        return;
-      } else {
+              // Between rounds: draft unless series is over
+        if (seriesRoundIndex >= SERIES_ROUNDS_TOTAL) {
+          // Series end
+          if (gameMode === 'online') {
+            // Handle ranking for online mode
+            const playerWon = winnerIdx === 0;
+            handleOnlineGameResult(playerWon);
+            
+            // Hide online indicator
+            const onlineIndicator = document.getElementById('onlineIndicator');
+            if (onlineIndicator) {
+              onlineIndicator.classList.add('hidden');
+            }
+            
+            // Reset online state
+            isOnline = false;
+          } else {
+            // Handle AI game result
+            const playerWon = winnerIdx === 0;
+            handleGameResult(playerWon);
+          }
+          
+          // Show main menu
+          showMainMenu();
+          const msg = scores[0] === scores[1] ? 'Series tied! Play again' : `P${scores[0] > scores[1] ? 1 : 2} wins the series!`;
+          
+          // Reset series
+          scores = [0, 0];
+          seriesRoundIndex = 1;
+          players.forEach(p => { p.levels = {}; p.applyCards(); });
+          return;
+        } else {
         seriesRoundIndex++;
         state = 'between';
         openDraft(winnerIdx === 0 ? 1 : 0); // loser picks first
@@ -1437,6 +1612,14 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
 
   // Ambient/environment particles
   let envTimer = 0;
+  
+  // Online multiplayer variables
+  let isOnline = false;
+  let onlinePlayers = [];
+  let matchmakingQueue = [];
+  let currentMatch = null;
+  let websocket = null;
+  let playerId = null;
   function updateEnvironment(dt) {
     envTimer -= dt;
     if (envTimer <= 0) {
