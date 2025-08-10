@@ -2122,3 +2122,11 @@ function spawnImpact(x, y, color, damage) {
   // Subtle screen shake based on damage
   addShake(Math.min(0.08, damage / 200));
 }
+
+  // Call loadData to initialize the game
+  loadData();
+  
+  // Start the game loop
+  loop();
+  
+}); // End of DOMContentLoaded event listener
