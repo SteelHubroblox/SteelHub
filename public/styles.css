@@ -208,6 +208,25 @@ html, body {
   border-color: rgba(255, 59, 48, 0.5);
 }
 
+.login-btn {
+  background: rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: #00d4ff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+}
+
+.login-btn:hover {
+  background: rgba(0, 212, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.2);
+}
+
 /* Main Menu Styles */
 .main-menu-container {
   display: flex;

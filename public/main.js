@@ -82,14 +82,14 @@ function loadData() {
     initializeLeaderboard();
   }
   
-  // Load current user
+  // Load current user (optional)
   const savedUser = localStorage.getItem('currentUser');
   if (savedUser) {
     currentUser = JSON.parse(savedUser);
-    showMainMenu();
-  } else {
-    showAuthOverlay();
   }
+  
+  // Always show main menu (no authentication required)
+  showMainMenu();
 }
 
 // Save data to localStorage
@@ -147,14 +147,24 @@ function hideAuthOverlay() {
 }
 
 function showMainMenu() {
-  if (!currentUser) {
-    showAuthOverlay();
-    return;
+  mainMenu.classList.remove('hidden');
+  gameSettings.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  draftOverlay.classList.add('hidden');
+  leaderboardOverlay.classList.add('hidden');
+  gameModeOptions.classList.remove('show');
+  
+  // Update user info display
+  if (currentUser) {
+    currentUsername.textContent = currentUser.username;
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'block';
+  } else {
+    currentUsername.textContent = 'Guest Player';
+    document.getElementById('loginBtn').style.display = 'block';
+    document.getElementById('logoutBtn').style.display = 'none';
   }
   
-  mainMenu.classList.remove('hidden');
-  authOverlay.classList.add('hidden');
-  currentUsername.textContent = currentUser.username;
   loadPlayerRank();
 }
 
@@ -166,13 +176,24 @@ function logout() {
 
 // Load player rank from localStorage
 function loadPlayerRank() {
-  if (!currentUser) return;
-  
-  const saved = localStorage.getItem(`playerRank_${currentUser.username}`);
-  if (saved) {
-    playerRank = { ...playerRank, ...JSON.parse(saved) };
+  if (currentUser) {
+    // Load player rank data from localStorage
+    const savedRank = localStorage.getItem(`playerRank_${currentUser.username}`);
+    if (savedRank) {
+      playerRank = JSON.parse(savedRank);
+    } else {
+      // Initialize new player at Bronze 1
+      playerRank = {
+        rank: 'BRONZE',
+        version: 1,
+        division: 1,
+        wins: 0,
+        losses: 0,
+        totalGames: 0
+      };
+    }
   } else {
-    // Initialize new player
+    // Guest player - use temporary rank
     playerRank = {
       rank: 'BRONZE',
       version: 1,
@@ -182,13 +203,17 @@ function loadPlayerRank() {
       totalGames: 0
     };
   }
+  
   updateRankDisplay();
 }
 
 // Save player rank to localStorage
 function savePlayerRank() {
-  if (!currentUser) return;
-  localStorage.setItem(`playerRank_${currentUser.username}`, JSON.stringify(playerRank));
+  if (currentUser) {
+    // Only save rank data for authenticated users
+    localStorage.setItem(`playerRank_${currentUser.username}`, JSON.stringify(playerRank));
+  }
+  // Guest users don't have persistent rank data
 }
 
 // Update rank display
@@ -275,6 +300,19 @@ function showMainMenu() {
   draftOverlay.classList.add('hidden');
   leaderboardOverlay.classList.add('hidden');
   gameModeOptions.classList.remove('show');
+  
+  // Update user info display
+  if (currentUser) {
+    currentUsername.textContent = currentUser.username;
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'block';
+  } else {
+    currentUsername.textContent = 'Guest Player';
+    document.getElementById('loginBtn').style.display = 'block';
+    document.getElementById('logoutBtn').style.display = 'none';
+  }
+  
+  loadPlayerRank();
 }
 
 function showGameSettings() {
@@ -434,6 +472,14 @@ showLoginBtn.addEventListener('click', () => {
 });
 logoutBtn.addEventListener('click', logout);
 
+// Main menu login button (for guest users)
+document.getElementById('loginBtn').addEventListener('click', () => {
+  mainMenu.classList.add('hidden');
+  authOverlay.classList.remove('hidden');
+  loginForm.classList.remove('hidden');
+  signupForm.classList.add('hidden');
+});
+
 // Handle login
 function handleLogin() {
   const username = document.getElementById('loginUsername').value.trim();
@@ -447,9 +493,13 @@ function handleLogin() {
   if (users[username] && users[username].password === password) {
     currentUser = { username };
     saveData();
-    showMainMenu();
+    
+    // Clear form fields
     document.getElementById('loginUsername').value = '';
     document.getElementById('loginPassword').value = '';
+    
+    // Return to main menu
+    showMainMenu();
   } else {
     alert('Invalid username or password');
   }
