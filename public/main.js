@@ -506,75 +506,254 @@ function pickNCards(pool, n) {
 function updateAI(p, dt) {
   const enemy = players[0];
   p.aiJumpCd = Math.max(0, p.aiJumpCd - dt);
-  if (p.aiOffsetX === 0 || Math.random() < 0.01) p.aiOffsetX = randRange(-140, 140);
-  const targetX = (enemy.x + enemy.w / 2) + p.aiOffsetX;
-  const dx = targetX - (p.x + p.w / 2);
+  
+  // Strategic positioning: AI tries to maintain optimal shooting distance
+  const optimalDistance = 200; // AI prefers this distance for shooting
+  const minDistance = 120; // Too close = bad for AI
+  const maxDistance = 400; // Too far = can't hit effectively
+  
+  // Calculate current distance to enemy
+  const currentDistance = Math.abs((p.x + p.w/2) - (enemy.x + enemy.w/2));
+  
+  // Determine if we need to move closer or farther
+  let distanceGoal = optimalDistance;
+  if (currentDistance < minDistance) {
+    distanceGoal = optimalDistance; // Move away if too close
+  } else if (currentDistance > maxDistance) {
+    distanceGoal = optimalDistance; // Move closer if too far
+  }
+  
+  // Find the best platform to position on
+  const allPlatforms = platforms.filter(s => s.h < 40); // All platforms except ground
+  let bestPlatform = null;
+  let bestScore = -Infinity;
+  
+  for (const platform of allPlatforms) {
+    const platformCenterX = platform.x + platform.w/2;
+    const distanceToEnemy = Math.abs(platformCenterX - (enemy.x + enemy.w/2));
+    
+    // Score platforms based on:
+    // 1. Distance to enemy (closer to optimal = better)
+    // 2. Height advantage (higher = better for shooting down)
+    // 3. Accessibility (can AI reach it?)
+    const distanceScore = 1000 - Math.abs(distanceToEnemy - optimalDistance);
+    const heightScore = (enemy.y - platform.y) * 2; // Higher platform = better
+    const accessibilityScore = canReachPlatform(p, platform) ? 500 : -1000;
+    
+    const totalScore = distanceScore + heightScore + accessibilityScore;
+    
+    if (totalScore > bestScore) {
+      bestScore = totalScore;
+      bestPlatform = platform;
+    }
+  }
+  
+  // If no good platform found, use ground
+  if (!bestPlatform) {
+    bestPlatform = platforms[0]; // Ground platform
+  }
+  
+  // Calculate target position on the chosen platform
+  const targetX = bestPlatform.x + bestPlatform.w/2;
+  const dx = targetX - (p.x + p.w/2);
   const wantDir = Math.sign(dx) || 0;
+  
+  // Movement logic with better acceleration
   const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.9;
   p.vx += wantDir * accel * dt;
   p.vx = clamp(p.vx, -MAX_VX * 0.85, MAX_VX * 0.85);
-
-  // Choose an upper platform toward enemy and jump only when roughly aligned
-  const upperPlatforms = platforms.filter(s => s.y + 1 < p.y && s.h < 40);
-  let targetPlat = null; let bestDY = Infinity;
-  for (const s of upperPlatforms) {
-    const cx = s.x + s.w / 2; const dy = p.y - s.y;
-    if (Math.abs((p.x + p.w / 2) - cx) < 140 && dy < bestDY) { bestDY = dy; targetPlat = s; }
+  
+  // Smart jumping logic
+  if (p.onGround && p.aiJumpCd === 0) {
+    let shouldJump = false;
+    
+    // Jump to reach higher platforms
+    if (bestPlatform && bestPlatform.y < p.y - 20) {
+      const platformCenterX = bestPlatform.x + bestPlatform.w/2;
+      const distanceToPlatform = Math.abs((p.x + p.w/2) - platformCenterX);
+      if (distanceToPlatform < 80) { // Close enough to jump
+        shouldJump = true;
+      }
+    }
+    
+    // Jump to avoid bullets
+    if (detectIncomingBullets(p, enemy)) {
+      shouldJump = true;
+    }
+    
+    // Jump to avoid hazards
+    if (detectHazardsAhead(p)) {
+      shouldJump = true;
+    }
+    
+    // Jump to dodge if enemy is too close
+    if (currentDistance < minDistance && Math.random() < 0.3) {
+      shouldJump = true;
+    }
+    
+    if (shouldJump) {
+      p.vy = -JUMP_V * 0.98;
+      p.onGround = false;
+      p.aiJumpCd = 0.7;
+    }
   }
-  const closeToPlat = targetPlat ? Math.abs((p.x + p.w/2) - (targetPlat.x + targetPlat.w/2)) < 120 : false;
-
-  // Detect incoming bullets to dodge occasionally
-  let shouldDodge = false;
-  for (const b of bullets) {
-    if (b.owner === enemy) continue; // only dodge player bullets
-    const vx = b.vx, vy = b.vy;
-    const toAIx = (p.x + p.w/2) - b.x; const toAIy = (p.y + p.h*0.5) - b.y;
-    const dist = Math.hypot(toAIx, toAIy) || 1;
-    const tti = dist / (Math.hypot(vx, vy) || 1);
-    // If bullet heading towards AI and impact soon
-    const dot = (vx * toAIx + vy * toAIy) / ((Math.hypot(vx, vy)||1) * dist);
-    if (dot > 0.8 && tti < 0.35) { shouldDodge = Math.random() < 0.5; break; }
-  }
-
-  // Hazard ahead check (feet area)
-  const lookAhead = 40 * Math.sign(p.vx || 1);
-  const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 20, h: 10 };
-  let dangerAhead = false; for (const hz of hazards) if (rectsIntersect(feetBox, hz)) { dangerAhead = true; break; }
-
-  if (p.onGround && p.aiJumpCd === 0 && (dangerAhead || closeToPlat || shouldDodge)) {
-    p.vy = -JUMP_V * 0.98;
-    p.onGround = false;
-    p.aiJumpCd = 0.7;
-  }
-
-  // Predictive aim with drop compensation
+  
+  // Predictive aiming with improved accuracy
   const gunX = p.x + p.w / 2 + p.facing * 12;
   const gunY = p.y + p.h * 0.35;
   const ex = enemy.x + enemy.w / 2;
   const ey = enemy.y + enemy.h * 0.4;
+  
+  // Calculate lead based on enemy movement and bullet travel time
   const relX = ex - gunX;
   const relY = ey - gunY;
   const distA = Math.hypot(relX, relY) || 1;
   let t = clamp(distA / p.bulletSpeed, 0.05, 0.8);
+  
+  // Account for gravity drop
   const gEff = G * 0.2;
   const leadX = ex + enemy.vx * t;
   const leadY = ey + enemy.vy * t - 0.5 * gEff * t * t;
+  
   let aimX = leadX - gunX;
   let aimY = leadY - gunY;
-  const n = Math.hypot(aimX, aimY) || 1; aimX/=n; aimY/=n;
-  aimX += randRange(-AI.aimJitter, AI.aimJitter); aimY += randRange(-AI.aimJitter, AI.aimJitter);
-  const n2 = Math.hypot(aimX, aimY) || 1; aimX/=n2; aimY/=n2;
+  
+  // Normalize and add slight randomness for realism
+  const n = Math.hypot(aimX, aimY) || 1;
+  aimX /= n;
+  aimY /= n;
+  
+  // Reduce aim jitter for better accuracy
+  aimX += randRange(-AI.aimJitter * 0.5, AI.aimJitter * 0.5);
+  aimY += randRange(-AI.aimJitter * 0.5, AI.aimJitter * 0.5);
+  
+  const n2 = Math.hypot(aimX, aimY) || 1;
+  aimX /= n2;
+  aimY /= n2;
+  
+  // Update facing direction
   p.facing = Math.sign(aimX) || 1;
-
+  
+  // Smart shooting logic
   p.reload -= dt;
-  if (p.reload <= 0 && Math.abs(dx) < canvas.width * 0.7 && !p.reloading && p.ammoInMag > 0) {
-    const vx = aimX * p.bulletSpeed;
-    const vy = aimY * p.bulletSpeed;
-    bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
-    p.ammoInMag--;
-    p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
-    addShake(0.05);
+  if (p.reload <= 0 && !p.reloading && p.ammoInMag > 0) {
+    // Only shoot when in good position and enemy is visible
+    const canSeeEnemy = !isEnemyBlocked(p, enemy);
+    const inGoodPosition = currentDistance >= minDistance && currentDistance <= maxDistance;
+    
+    if (canSeeEnemy && inGoodPosition) {
+      const vx = aimX * p.bulletSpeed;
+      const vy = aimY * p.bulletSpeed;
+      bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
+      p.ammoInMag--;
+      p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
+      addShake(0.05);
+    }
   }
+}
+
+// Helper function to check if AI can reach a platform
+function canReachPlatform(p, platform) {
+  const platformCenterX = platform.x + platform.w/2;
+  const distanceToPlatform = Math.abs((p.x + p.w/2) - platformCenterX);
+  const heightDifference = p.y - platform.y;
+  
+  // Can jump to platform if it's within reasonable distance and height
+  return distanceToPlatform < 120 && heightDifference < 200;
+}
+
+// Helper function to detect incoming bullets
+function detectIncomingBullets(p, enemy) {
+  for (const b of bullets) {
+    if (b.owner === enemy) {
+      const vx = b.vx, vy = b.vy;
+      const toAIx = (p.x + p.w/2) - b.x;
+      const toAIy = (p.y + p.h*0.5) - b.y;
+      const dist = Math.hypot(toAIx, toAIy) || 1;
+      const tti = dist / (Math.hypot(vx, vy) || 1);
+      
+      // If bullet heading towards AI and impact soon
+      const dot = (vx * toAIx + vy * toAIy) / ((Math.hypot(vx, vy)||1) * dist);
+      if (dot > 0.7 && tti < 0.4) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Helper function to detect hazards ahead
+function detectHazardsAhead(p) {
+  const lookAhead = 50 * Math.sign(p.vx || 1);
+  const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 30, h: 10 };
+  
+  for (const hz of hazards) {
+    if (rectsIntersect(feetBox, hz)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Helper function to check if enemy is blocked from view
+function isEnemyBlocked(p, enemy) {
+  // Simple line of sight check - if there's a platform between AI and enemy
+  const aiCenterX = p.x + p.w/2;
+  const aiCenterY = p.y + p.h/2;
+  const enemyCenterX = enemy.x + enemy.w/2;
+  const enemyCenterY = enemy.y + enemy.h/2;
+  
+  for (const platform of platforms) {
+    if (platform === platforms[0]) continue; // Skip ground
+    
+    // Check if platform blocks the line of sight
+    if (lineIntersectsRect(aiCenterX, aiCenterY, enemyCenterX, enemyCenterY, platform)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Helper function to check if a line intersects a rectangle
+function lineIntersectsRect(x1, y1, x2, y2, rect) {
+  // Check if line segment intersects rectangle
+  const left = rect.x;
+  const right = rect.x + rect.w;
+  const top = rect.y;
+  const bottom = rect.y + rect.h;
+  
+  // Check if either endpoint is inside the rectangle
+  if ((x1 >= left && x1 <= right && y1 >= top && y1 <= bottom) ||
+      (x2 >= left && x2 <= right && y2 >= top && y2 <= bottom)) {
+    return true;
+  }
+  
+  // Check if line intersects any of the rectangle's edges
+  const edges = [
+    {x1: left, y1: top, x2: right, y2: top},     // Top edge
+    {x1: right, y1: top, x2: right, y2: bottom}, // Right edge
+    {x1: right, y1: bottom, x2: left, y2: bottom}, // Bottom edge
+    {x1: left, y1: bottom, x2: left, y2: top}    // Left edge
+  ];
+  
+  for (const edge of edges) {
+    if (linesIntersect(x1, y1, x2, y2, edge.x1, edge.y1, edge.x2, edge.y2)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Helper function to check if two line segments intersect
+function linesIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+  const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (den === 0) return false;
+  
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+  
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 }
 
 // Mobile controls
