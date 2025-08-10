@@ -127,6 +127,9 @@ document.addEventListener('DOMContentLoaded', function() {
     leaderboardOverlay.classList.add('hidden');
     gameModeOptions.classList.remove('show');
     
+    // Hide pause button when returning to menu
+    pauseButton.classList.add('hidden');
+    
     // Update user info display
     if (currentUser) {
       currentUsername.textContent = currentUser.username;
@@ -301,6 +304,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // Pause button event listeners
+  const pauseButton = document.getElementById('pauseButton');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const btnResume = document.getElementById('btnResume');
+  const btnQuit = document.getElementById('btnQuit');
+
+  pauseButton.addEventListener('click', () => {
+    setPaused(!paused);
+  });
+
+  btnResume.addEventListener('click', () => {
+    setPaused(false);
+  });
+
+  btnQuit.addEventListener('click', () => {
+    if (isOnline) {
+      // For online games, forfeit counts as a loss
+      handleOnlineGameResult(false);
+      isOnline = false;
+    }
+    setPaused(false);
+    showMainMenu();
+  });
+
   // Start button event listener
   startButton.addEventListener('click', () => {
     if (gameMode === 'vsAI') {
@@ -314,6 +341,12 @@ document.addEventListener('DOMContentLoaded', function() {
       players[0].reset(); players[1].reset();
       players[0].applyCards(); players[1].applyCards();
       gameSettings.classList.add('hidden');
+      
+      // Show pause button for AI games
+      pauseButton.classList.remove('hidden');
+      if (checkMobile()) {
+        pauseButton.classList.add('mobile');
+      }
     } else if (gameMode === 'online') {
       // For now, start with AI but track as online
       state = 'playing';
@@ -324,6 +357,12 @@ document.addEventListener('DOMContentLoaded', function() {
       players[0].reset(); players[1].reset();
       players[0].applyCards(); players[1].applyCards();
       gameSettings.classList.add('hidden');
+      
+      // Show pause button for online games
+      pauseButton.classList.remove('hidden');
+      if (checkMobile()) {
+        pauseButton.classList.add('mobile');
+      }
     }
   });
 
@@ -540,10 +579,11 @@ document.addEventListener('DOMContentLoaded', function() {
     mainMenu.classList.add('hidden');
     showMatchmakingScreen();
     
-    // Simulate finding a match (in a real implementation, this would connect to a server)
+    // In a real implementation, this would connect to a matchmaking server
+    // For now, we'll simulate a longer search and show "No players found"
     setTimeout(() => {
-      findOnlineMatch();
-    }, 2000);
+      showNoPlayersFound();
+    }, 5000);
   }
   
   function showMatchmakingScreen() {
@@ -574,52 +614,27 @@ document.addEventListener('DOMContentLoaded', function() {
     matchmakingOverlay.classList.remove('hidden');
   }
   
-  function findOnlineMatch() {
-    // Simulate finding a match
+  function showNoPlayersFound() {
     const matchmakingOverlay = document.getElementById('matchmakingOverlay');
     if (matchmakingOverlay) {
       const status = matchmakingOverlay.querySelector('.matchmaking-status');
-      status.textContent = 'Match found! Starting game...';
+      status.textContent = 'No players found. Try again later.';
       
-      setTimeout(() => {
-        startOnlineGame();
-      }, 1500);
+      // Add a "Return to Menu" button
+      const menuRow = matchmakingOverlay.querySelector('.menu-row');
+      menuRow.innerHTML = `
+        <button id="btnReturnToMenu" class="primary">Return to Menu</button>
+        <button id="btnCancelMatchmaking" class="secondary">Cancel</button>
+      `;
+      
+      // Add event listeners
+      document.getElementById('btnReturnToMenu').addEventListener('click', () => {
+        cancelMatchmaking();
+      });
+      document.getElementById('btnCancelMatchmaking').addEventListener('click', () => {
+        cancelMatchmaking();
+      });
     }
-  }
-  
-  function startOnlineGame() {
-    // Hide matchmaking screen
-    const matchmakingOverlay = document.getElementById('matchmakingOverlay');
-    if (matchmakingOverlay) {
-      matchmakingOverlay.classList.add('hidden');
-    }
-    
-    // Create online opponent (simulated for now)
-    const onlineOpponent = new Player(1, '#ff8a80', { ai: false, online: true });
-    onlineOpponent.username = 'OnlinePlayer_' + Math.floor(Math.random() * 1000);
-    
-    // Replace AI player with online player
-    players[1] = onlineOpponent;
-    
-    // Start the game
-    state = 'playing';
-    bullets = [];
-    particles.length = 0;
-    buildArena(currentArena);
-    currentArena = (currentArena + 1) % 4;
-    players[0].reset(); 
-    players[1].reset();
-    players[0].applyCards(); 
-    players[1].applyCards();
-    
-    // Hide the main menu
-    mainMenu.classList.add('hidden');
-    
-    // Show online indicator
-    showOnlineIndicator();
-    
-    // Set online mode flag
-    isOnline = true;
   }
   
   function showOnlineIndicator() {
@@ -960,7 +975,14 @@ const ALL_CARDS = [
   const difficultySel = document.getElementById('difficulty');
   
   // Remove the old startButton.onclick since we have a proper event listener below
-  function overlayHideDraft() { draftOverlay.classList.add('hidden'); }
+  function overlayHideDraft() { 
+    draftOverlay.classList.add('hidden'); 
+    // Show pause button when returning from draft
+    pauseButton.classList.remove('hidden');
+    if (checkMobile()) {
+      pauseButton.classList.add('mobile');
+    }
+  }
 
   // Multiple arenas
   let currentArena = 0;
@@ -1224,6 +1246,12 @@ const ALL_CARDS = [
     currentArena = (currentArena + 1) % 4; // rotate arenas each engagement
     players[0].reset(); players[1].reset();
     players[0].applyCards(); players[1].applyCards();
+    
+    // Show pause button for all game modes
+    pauseButton.classList.remove('hidden');
+    if (checkMobile()) {
+      pauseButton.classList.add('mobile');
+    }
     
     // If this is an online game, ensure the online indicator is shown
     if (isOnline) {
@@ -2218,22 +2246,24 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
   function setPaused(v) {
     paused = v;
     pauseOverlay.classList.toggle('hidden', !paused);
-  }
-
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'Escape') {
-      if (state === 'playing') setPaused(!paused);
+    
+    // Show/hide pause button based on game state
+    if (state === 'playing') {
+      pauseButton.classList.toggle('hidden', paused);
     }
-  });
-  btnResume?.addEventListener('click', () => setPaused(false));
-  btnQuit?.addEventListener('click', () => { 
-    setPaused(false); 
-    showMainMenu(); 
-    // Reset game state when quitting to menu
-    state = 'menu';
-    bullets = [];
-    particles.length = 0;
-  });
+    
+    // Update pause overlay text based on game mode
+    const quitButton = document.getElementById('btnQuit');
+    if (quitButton) {
+      if (isOnline) {
+        quitButton.textContent = 'Forfeit (Loss)';
+        quitButton.className = 'primary danger';
+      } else {
+        quitButton.textContent = 'Quit to Menu';
+        quitButton.className = 'primary';
+      }
+    }
+  }
 
   // Improved sleek jump VFX
   function spawnPuff(x, y, color, count=8) {

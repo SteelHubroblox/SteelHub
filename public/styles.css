@@ -632,6 +632,16 @@ button.primary:hover {
   background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
 }
 
+button.primary.danger {
+  background: linear-gradient(180deg, rgba(211, 47, 47, 0.8), rgba(211, 47, 47, 0.2));
+  border-color: rgba(211, 47, 47, 0.6);
+}
+
+button.primary.danger:hover {
+  background: linear-gradient(180deg, rgba(183, 28, 28, 0.9), rgba(183, 28, 28, 0.3));
+  border-color: rgba(183, 28, 28, 0.7);
+}
+
 button.secondary {
   padding: 12px 20px;
   border-radius: 10px;
@@ -765,11 +775,43 @@ canvas {
   #mobileControls.show { display: block; }
 }
 
+/* Pause Button Styles */
+.pause-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #ff9800;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.pause-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: #ffb74d;
+  transform: scale(1.1);
+}
+
+.pause-button.mobile {
+  top: auto;
+  bottom: 20px;
+  right: 20px;
+}
+
 /* Online Multiplayer Styles */
 .online-indicator {
   position: fixed;
   top: 20px;
-  right: 20px;
+  right: 80px;
   background: rgba(0, 0, 0, 0.8);
   border: 2px solid #69f0ae;
   border-radius: 8px;
