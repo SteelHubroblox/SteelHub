@@ -774,11 +774,12 @@ const ALL_CARDS = [
     return pool;
   }
 
-// Game state
-let players = [
-  new Player(0, '#69f0ae', { left: 'KeyA', right: 'KeyD', jump: 'Space', fire: 'MouseLeft' }),
-  new Player(1, '#ff8a80', { ai: true }),
-];
+  // Game state
+  let players = [
+    new Player(0, '#69f0ae', { left: 'KeyA', right: 'KeyD', jump: 'Space', fire: 'MouseLeft' }),
+    new Player(1, '#ff8a80', { ai: true }),
+  ];
+  
   // Game state variables
   let bullets = [];
   let winner = null;
