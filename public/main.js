@@ -46,18 +46,23 @@ let mouseDown = false;
 window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown = true; });
 window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
 
-// World platforms (side view)
+// World platforms (side view) with cool shapes and colors
 let platforms = [];
 function makeDefaultPlatforms() {
   const w = canvas.width, h = canvas.height;
   platforms = [
-    // ground
-    { x: 0, y: h - 60, w: w, h: 60 },
-    // mid platforms
-    { x: w * 0.2, y: h * 0.68, w: 220, h: 16 },
-    { x: w * 0.6, y: h * 0.56, w: 260, h: 16 },
-    { x: w * 0.15, y: h * 0.44, w: 180, h: 16 },
-    { x: w * 0.55, y: h * 0.34, w: 220, h: 16 },
+    // ground - dark stone with subtle texture
+    { x: 0, y: h - 60, w: w, h: 60, type: 'ground', color: '#2a2a2a', pattern: 'stone' },
+    
+    // mid platforms with different shapes and colors
+    { x: w * 0.2, y: h * 0.68, w: 220, h: 16, type: 'platform', color: '#4a7c59', pattern: 'rounded', shape: 'rounded' },
+    { x: w * 0.6, y: h * 0.56, w: 260, h: 16, type: 'platform', color: '#8b5a96', pattern: 'crystal', shape: 'crystal' },
+    { x: w * 0.15, y: h * 0.44, w: 180, h: 16, type: 'platform', color: '#d4a574', pattern: 'wood', shape: 'wood' },
+    { x: w * 0.55, y: h * 0.34, w: 220, h: 16, type: 'platform', color: '#6b8e23', pattern: 'grass', shape: 'grass' },
+    
+    // floating platforms
+    { x: w * 0.35, y: h * 0.25, w: 140, h: 12, type: 'platform', color: '#4682b4', pattern: 'ice', shape: 'ice' },
+    { x: w * 0.75, y: h * 0.18, w: 160, h: 14, type: 'platform', color: '#daa520', pattern: 'gold', shape: 'gold' },
   ];
 }
 makeDefaultPlatforms();
@@ -289,41 +294,178 @@ function playerHitsHazard(p) {
   return false;
 }
 
-// Parallax background layers
+// Enhanced parallax background with pyramids, mountains, and 3D elements
 const parallaxLayers = [];
 function setupParallax() {
   parallaxLayers.length = 0;
-  // Far layer: big soft shapes
-  parallaxLayers.push({ kind: 'hills', speed: 0.02, color: currentPalette.bgTop, seed: 1 });
-  // Mid layer: medium shapes
-  parallaxLayers.push({ kind: 'hills', speed: 0.05, color: currentPalette.platBot || '#2b3346', seed: 2 });
-  // Near layer: small dots/stars
-  parallaxLayers.push({ kind: 'dots', speed: 0.1, color: currentPalette.accent, seed: 3 });
+  
+  // Far layer: distant mountains and pyramids
+  parallaxLayers.push({ 
+    kind: 'mountains', 
+    speed: 0.01, 
+    color: '#1a1a2e', 
+    seed: 1,
+    height: 0.4,
+    detail: 'low'
+  });
+  
+  // Mid-far layer: pyramids and mesas
+  parallaxLayers.push({ 
+    kind: 'pyramids', 
+    speed: 0.025, 
+    color: '#16213e', 
+    seed: 2,
+    height: 0.5,
+    detail: 'medium'
+  });
+  
+  // Mid layer: hills and plateaus
+  parallaxLayers.push({ 
+    kind: 'hills', 
+    speed: 0.05, 
+    color: '#0f3460', 
+    seed: 3,
+    height: 0.6,
+    detail: 'medium'
+  });
+  
+  // Near layer: detailed terrain
+  parallaxLayers.push({ 
+    kind: 'terrain', 
+    speed: 0.08, 
+    color: '#533483', 
+    seed: 4,
+    height: 0.7,
+    detail: 'high'
+  });
+  
+  // Very near layer: small details and particles
+  parallaxLayers.push({ 
+    kind: 'particles', 
+    speed: 0.12, 
+    color: '#e94560', 
+    seed: 5,
+    count: 60
+  });
 }
 
 function drawParallax() {
   const w = canvas.width, h = canvas.height;
+  
   for (const layer of parallaxLayers) {
-    if (layer.kind === 'hills') {
-      const yBase = h * 0.8;
-      const offset = (simTime * layer.speed * 80) % w;
-      ctx.fillStyle = layer.color + '55';
-      ctx.beginPath();
-      ctx.moveTo(-offset, yBase);
-      for (let x = -offset; x <= w + 100; x += 100) {
-        const peak = yBase - 40 - 30 * Math.sin((x + layer.seed * 73) * 0.01);
-        ctx.quadraticCurveTo(x + 50, peak, x + 100, yBase);
-      }
-      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
-    } else if (layer.kind === 'dots') {
-      const count = 40;
-      for (let i = 0; i < count; i++) {
-        const x = ((i * 97 + layer.seed * 131) % w + (simTime * layer.speed * 120)) % w;
-        const y = (i * 53 + layer.seed * 77) % (h * 0.6);
-        ctx.fillStyle = layer.color + '55';
-        ctx.fillRect(x, y, 2, 2);
-      }
+    if (layer.kind === 'mountains') {
+      drawMountains(layer, w, h);
+    } else if (layer.kind === 'pyramids') {
+      drawPyramids(layer, w, h);
+    } else if (layer.kind === 'hills') {
+      drawHills(layer, w, h);
+    } else if (layer.kind === 'terrain') {
+      drawTerrain(layer, w, h);
+    } else if (layer.kind === 'particles') {
+      drawParticles(layer, w, h);
     }
+  }
+}
+
+function drawMountains(layer, w, h) {
+  const yBase = h * layer.height;
+  const offset = (simTime * layer.speed * 60) % w;
+  
+  ctx.fillStyle = layer.color + '88';
+  ctx.beginPath();
+  ctx.moveTo(-offset, yBase);
+  
+  for (let x = -offset; x <= w + 200; x += 200) {
+    const peak1 = yBase - 80 - 60 * Math.sin((x + layer.seed * 73) * 0.005);
+    const peak2 = yBase - 60 - 40 * Math.sin((x + layer.seed * 131) * 0.008);
+    const peak3 = yBase - 40 - 30 * Math.sin((x + layer.seed * 97) * 0.012);
+    
+    ctx.quadraticCurveTo(x + 50, peak1, x + 100, peak2);
+    ctx.quadraticCurveTo(x + 150, peak3, x + 200, yBase);
+  }
+  
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawPyramids(layer, w, h) {
+  const yBase = h * layer.height;
+  const offset = (simTime * layer.speed * 80) % w;
+  
+  ctx.fillStyle = layer.color + 'aa';
+  
+  for (let x = -offset; x <= w + 300; x += 300) {
+    const pyramidWidth = 120 + Math.sin((x + layer.seed * 47) * 0.01) * 40;
+    const pyramidHeight = 80 + Math.sin((x + layer.seed * 89) * 0.015) * 30;
+    
+    ctx.beginPath();
+    ctx.moveTo(x, yBase);
+    ctx.lineTo(x + pyramidWidth/2, yBase - pyramidHeight);
+    ctx.lineTo(x + pyramidWidth, yBase);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Add pyramid details
+    ctx.strokeStyle = layer.color + '44';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + pyramidWidth/2, yBase - pyramidHeight);
+    ctx.lineTo(x + pyramidWidth/2, yBase);
+    ctx.stroke();
+  }
+}
+
+function drawHills(layer, w, h) {
+  const yBase = h * layer.height;
+  const offset = (simTime * layer.speed * 100) % w;
+  
+  ctx.fillStyle = layer.color + '99';
+  ctx.beginPath();
+  ctx.moveTo(-offset, yBase);
+  
+  for (let x = -offset; x <= w + 150; x += 150) {
+    const peak = yBase - 50 - 35 * Math.sin((x + layer.seed * 73) * 0.01);
+    ctx.quadraticCurveTo(x + 75, peak, x + 150, yBase);
+  }
+  
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawTerrain(layer, w, h) {
+  const yBase = h * layer.height;
+  const offset = (simTime * layer.speed * 120) % w;
+  
+  ctx.fillStyle = layer.color + 'bb';
+  ctx.beginPath();
+  ctx.moveTo(-offset, yBase);
+  
+  for (let x = -offset; x <= w + 100; x += 100) {
+    const peak = yBase - 30 - 20 * Math.sin((x + layer.seed * 73) * 0.02);
+    const detail = 8 * Math.sin((x + layer.seed * 131) * 0.05);
+    ctx.quadraticCurveTo(x + 50, peak + detail, x + 100, yBase);
+  }
+  
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawParticles(layer, w, h) {
+  const count = layer.count || 40;
+  
+  for (let i = 0; i < count; i++) {
+    const x = ((i * 97 + layer.seed * 131) % w + (simTime * layer.speed * 150)) % w;
+    const y = (i * 53 + layer.seed * 77) % (h * 0.5);
+    const size = 1 + Math.sin((i + simTime * 2) * 0.1) * 0.5;
+    
+    ctx.fillStyle = layer.color + '66';
+    ctx.fillRect(x, y, size, size);
   }
 }
 
@@ -427,9 +569,6 @@ function spawnParticle(x, y, color) {
 function spawnSpark(x, y, color) {
   particles.push({ x, y, vx: randRange(-260,260), vy: randRange(-180,60), life: 0.35, maxLife: 0.35, color, size: randRange(2,3), rot: Math.random()*Math.PI, rotV: randRange(-10,10), type: 'spark', drag: 0.96, grav: 600 });
 }
-function spawnPuff(x, y, color, count=10) {
-  for (let i=0;i<count;i++) particles.push({ x, y, vx: randRange(-120,120), vy: randRange(-260,-80), life: 0.6, maxLife: 0.6, color, size: randRange(3,6), rot: Math.random()*Math.PI, rotV: randRange(-3,3), type: 'puff', drag: 0.985, grav: 900 });
-}
 
 let shakeT = 0;
 function addShake(s) { shakeT = Math.min(0.3, shakeT + s); }
@@ -507,77 +646,33 @@ function updateAI(p, dt) {
   const enemy = players[0];
   p.aiJumpCd = Math.max(0, p.aiJumpCd - dt);
   
-  // Strategic positioning: AI tries to maintain optimal shooting distance
-  const optimalDistance = 200; // AI prefers this distance for shooting
-  const minDistance = 120; // Too close = bad for AI
-  const maxDistance = 400; // Too far = can't hit effectively
+  // Simple distance-based movement
+  const dx = (enemy.x + enemy.w/2) - (p.x + p.w/2);
+  const currentDistance = Math.abs(dx);
   
-  // Calculate current distance to enemy
-  const currentDistance = Math.abs((p.x + p.w/2) - (enemy.x + enemy.w/2));
-  
-  // Determine if we need to move closer or farther
-  let distanceGoal = optimalDistance;
-  if (currentDistance < minDistance) {
-    distanceGoal = optimalDistance; // Move away if too close
-  } else if (currentDistance > maxDistance) {
-    distanceGoal = optimalDistance; // Move closer if too far
-  }
-  
-  // Find the best platform to position on
-  const allPlatforms = platforms.filter(s => s.h < 40); // All platforms except ground
-  let bestPlatform = null;
-  let bestScore = -Infinity;
-  
-  for (const platform of allPlatforms) {
-    const platformCenterX = platform.x + platform.w/2;
-    const distanceToEnemy = Math.abs(platformCenterX - (enemy.x + enemy.w/2));
-    
-    // Score platforms based on:
-    // 1. Distance to enemy (closer to optimal = better)
-    // 2. Height advantage (higher = better for shooting down)
-    // 3. Accessibility (can AI reach it?)
-    const distanceScore = 1000 - Math.abs(distanceToEnemy - optimalDistance);
-    const heightScore = (enemy.y - platform.y) * 2; // Higher platform = better
-    const accessibilityScore = canReachPlatform(p, platform) ? 500 : -1000;
-    
-    const totalScore = distanceScore + heightScore + accessibilityScore;
-    
-    if (totalScore > bestScore) {
-      bestScore = totalScore;
-      bestPlatform = platform;
-    }
-  }
-  
-  // If no good platform found, use ground
-  if (!bestPlatform) {
-    bestPlatform = platforms[0]; // Ground platform
-  }
-  
-  // Calculate target position on the chosen platform
-  const targetX = bestPlatform.x + bestPlatform.w/2;
-  const dx = targetX - (p.x + p.w/2);
-  const wantDir = Math.sign(dx) || 0;
-  
-  // Movement logic with better acceleration
-  const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.9;
+  // Basic movement - move towards enemy but keep some distance
+  const wantDir = Math.sign(dx);
+  const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.8;
   p.vx += wantDir * accel * dt;
-  p.vx = clamp(p.vx, -MAX_VX * 0.85, MAX_VX * 0.85);
+  p.vx = clamp(p.vx, -MAX_VX * 0.8, MAX_VX * 0.8);
   
-  // Smart jumping logic
+  // Simple jumping logic
   if (p.onGround && p.aiJumpCd === 0) {
     let shouldJump = false;
     
-    // Jump to reach higher platforms
-    if (bestPlatform && bestPlatform.y < p.y - 20) {
-      const platformCenterX = bestPlatform.x + bestPlatform.w/2;
+    // Jump to reach higher platforms when close
+    const upperPlatforms = platforms.filter(s => s.y < p.y - 20 && s.h < 40);
+    for (const platform of upperPlatforms) {
+      const platformCenterX = platform.x + platform.w/2;
       const distanceToPlatform = Math.abs((p.x + p.w/2) - platformCenterX);
-      if (distanceToPlatform < 80) { // Close enough to jump
+      if (distanceToPlatform < 100) {
         shouldJump = true;
+        break;
       }
     }
     
-    // Jump to avoid bullets
-    if (detectIncomingBullets(p, enemy)) {
+    // Jump to dodge bullets occasionally
+    if (detectIncomingBullets(p, enemy) && Math.random() < 0.6) {
       shouldJump = true;
     }
     
@@ -586,80 +681,56 @@ function updateAI(p, dt) {
       shouldJump = true;
     }
     
-    // Jump to dodge if enemy is too close
-    if (currentDistance < minDistance && Math.random() < 0.3) {
+    // Jump if too close to enemy
+    if (currentDistance < 80 && Math.random() < 0.4) {
       shouldJump = true;
     }
     
     if (shouldJump) {
-      p.vy = -JUMP_V * 0.98;
+      p.vy = -JUMP_V * 0.9;
       p.onGround = false;
-      p.aiJumpCd = 0.7;
+      p.aiJumpCd = 0.5;
     }
   }
   
-  // Predictive aiming with improved accuracy
+  // Simple aiming - just point at enemy
   const gunX = p.x + p.w / 2 + p.facing * 12;
   const gunY = p.y + p.h * 0.35;
   const ex = enemy.x + enemy.w / 2;
   const ey = enemy.y + enemy.h * 0.4;
   
-  // Calculate lead based on enemy movement and bullet travel time
-  const relX = ex - gunX;
-  const relY = ey - gunY;
-  const distA = Math.hypot(relX, relY) || 1;
-  let t = clamp(distA / p.bulletSpeed, 0.05, 0.8);
+  let aimX = ex - gunX;
+  let aimY = ey - gunY;
   
-  // Account for gravity drop
-  const gEff = G * 0.2;
-  const leadX = ex + enemy.vx * t;
-  const leadY = ey + enemy.vy * t - 0.5 * gEff * t * t;
-  
-  let aimX = leadX - gunX;
-  let aimY = leadY - gunY;
-  
-  // Normalize and add slight randomness for realism
+  // Normalize
   const n = Math.hypot(aimX, aimY) || 1;
   aimX /= n;
   aimY /= n;
   
-  // Reduce aim jitter for better accuracy
-  aimX += randRange(-AI.aimJitter * 0.5, AI.aimJitter * 0.5);
-  aimY += randRange(-AI.aimJitter * 0.5, AI.aimJitter * 0.5);
+  // Add some randomness
+  aimX += randRange(-0.1, 0.1);
+  aimY += randRange(-0.1, 0.1);
   
   const n2 = Math.hypot(aimX, aimY) || 1;
   aimX /= n2;
   aimY /= n2;
   
-  // Update facing direction
+  // Update facing
   p.facing = Math.sign(aimX) || 1;
   
-  // Smart shooting logic
+  // Simple shooting - shoot when reloaded and enemy is visible
   p.reload -= dt;
   if (p.reload <= 0 && !p.reloading && p.ammoInMag > 0) {
-    // Only shoot when in good position and enemy is visible
-    const canSeeEnemy = !isEnemyBlocked(p, enemy);
-    const inGoodPosition = currentDistance >= minDistance && currentDistance <= maxDistance;
-    
-    if (canSeeEnemy && inGoodPosition) {
+    // Shoot if enemy is roughly in front and not too far
+    if (Math.abs(dx) < 500 && Math.abs(dx) > 50) {
       const vx = aimX * p.bulletSpeed;
       const vy = aimY * p.bulletSpeed;
       bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
       p.ammoInMag--;
-      p.reload = p.fireDelay * (0.9 + AI.react * 0.6);
+      p.reload = p.fireDelay * (0.8 + AI.react * 0.4);
       addShake(0.05);
     }
   }
-}
-
-// Helper function to check if AI can reach a platform
-function canReachPlatform(p, platform) {
-  const platformCenterX = platform.x + platform.w/2;
-  const distanceToPlatform = Math.abs((p.x + p.w/2) - platformCenterX);
-  const heightDifference = p.y - platform.y;
-  
-  // Can jump to platform if it's within reasonable distance and height
-  return distanceToPlatform < 120 && heightDifference < 200;
 }
 
 // Helper function to detect incoming bullets
@@ -859,8 +930,7 @@ function update(dt) {
         p.vy = -JUMP_V * (1 + p.jumpBoost);
         p.onGround = false;
         p.jumpsUsed++;
-        spawnRing(p.x + p.w/2, p.y + p.h, currentPalette.accent, 0.25, 14);
-        for (let i=0;i<8;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color);
+        spawnPuff(p.x + p.w/2, p.y + p.h, p.color);
       }
 
       if (keys.has('KeyR') && !p.reloading && p.ammoInMag < p.magSize) { p.reloading = true; p.reloadTimer = p.reloadTime; }
@@ -925,7 +995,7 @@ function update(dt) {
     // advance crumble timers
     for (const s of platforms) if (s.crumble && s.timer >= 0 && s.active) { s.timer -= dt; if (s.timer <= 0) { s.active = false; s.respawnTimer = s.respawn; } }
 
-    if (!prevOnGround && p.onGround) { spawnRing(p.x + p.w/2, p.y + p.h, '#ffffff', 0.2, 12); for (let i=0;i<10;i++) spawnParticle(p.x + p.w/2, p.y + p.h, p.color); }
+    if (!prevOnGround && p.onGround) { spawnPuff(p.x + p.w/2, p.y + p.h, p.color); }
 
     if (playerHitsHazard(p)) { p.hp -= 40*dt; spawnParticle(p.x + p.w/2, p.y + p.h, currentPalette.spike); }
 
@@ -954,10 +1024,8 @@ function update(dt) {
         p.hp -= b.dmg;
         if (b.owner.lifesteal) b.owner.hp = clamp((b.owner.hp||100) + b.owner.lifesteal, 0, b.owner.maxHp||100);
         p.vx += Math.sign(b.vx) * 80; p.vy -= 120;
-        // Impact VFX
-        spawnParticle(b.x, b.y, b.color);
-        spawnRing(b.x, b.y, currentPalette.accent, 0.18, 16);
-        addShake(0.08);
+        // Sleek impact VFX
+        spawnImpact(b.x, b.y, b.color, b.dmg);
         if (b.pierces > 0) { b.pierces--; } else { bullets.splice(i, 1); }
         break;
       }
@@ -1136,14 +1204,210 @@ function drawGunAt(originX, originY, aimDirX, aimDirY, length = 22, thickness = 
 }
 
 function drawPlatform(s) {
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  drawRoundedRect(Math.floor(s.x)+3, Math.floor(s.y)+6, Math.floor(s.w), Math.floor(s.h), 8); ctx.fill();
-  // top gradient from palette
-  const g = ctx.createLinearGradient(0, s.y, 0, s.y + s.h);
-  g.addColorStop(0, currentPalette.platTop); g.addColorStop(1, currentPalette.platBot || '#2b3346');
-  ctx.fillStyle = g; drawRoundedRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h), 8); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; drawRoundedRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.w), Math.floor(s.h), 8); ctx.stroke();
+  if (!s.active) return;
+  
+  ctx.save();
+  
+  // Set the base color
+  ctx.fillStyle = s.color || '#4a7c59';
+  
+  // Apply different drawing styles based on platform type
+  if (s.type === 'ground') {
+    // Ground platform with stone texture
+    drawGroundPlatform(s);
+  } else if (s.shape === 'rounded') {
+    // Rounded platform with smooth edges
+    drawRoundedPlatform(s);
+  } else if (s.shape === 'crystal') {
+    // Crystal platform with geometric edges
+    drawCrystalPlatform(s);
+  } else if (s.shape === 'wood') {
+    // Wooden platform with grain texture
+    drawWoodPlatform(s);
+  } else if (s.shape === 'grass') {
+    // Grass platform with organic feel
+    drawGrassPlatform(s);
+  } else if (s.shape === 'ice') {
+    // Ice platform with translucent effect
+    drawIcePlatform(s);
+  } else if (s.shape === 'gold') {
+    // Gold platform with metallic shine
+    drawGoldPlatform(s);
+  } else {
+    // Default platform
+    drawDefaultPlatform(s);
+  }
+  
+  ctx.restore();
+}
+
+function drawGroundPlatform(s) {
+  // Stone ground with subtle texture
+  const gradient = ctx.createLinearGradient(s.x, s.y, s.x, s.y + s.h);
+  gradient.addColorStop(0, s.color);
+  gradient.addColorStop(1, '#1a1a1a');
+  
+  ctx.fillStyle = gradient;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  
+  // Add stone texture lines
+  ctx.strokeStyle = '#00000022';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = s.y + (i + 1) * (s.h / 6);
+    ctx.beginPath();
+    ctx.moveTo(s.x, y);
+    ctx.lineTo(s.x + s.w, y);
+    ctx.stroke();
+  }
+}
+
+function drawRoundedPlatform(s) {
+  // Smooth rounded platform
+  ctx.beginPath();
+  ctx.moveTo(s.x + 8, s.y);
+  ctx.lineTo(s.x + s.w - 8, s.y);
+  ctx.quadraticCurveTo(s.x + s.w, s.y, s.x + s.w, s.y + 8);
+  ctx.lineTo(s.x + s.w, s.y + s.h - 8);
+  ctx.quadraticCurveTo(s.x + s.w, s.y + s.h, s.x + s.w - 8, s.y + s.h);
+  ctx.lineTo(s.x + 8, s.y + s.h);
+  ctx.quadraticCurveTo(s.x, s.y + s.h, s.x, s.y + s.h - 8);
+  ctx.lineTo(s.x, s.y + 8);
+  ctx.quadraticCurveTo(s.x, s.y, s.x + 8, s.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Add subtle highlight
+  ctx.strokeStyle = '#ffffff33';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawCrystalPlatform(s) {
+  // Geometric crystal platform
+  const segments = 6;
+  const segmentWidth = s.w / segments;
+  
+  ctx.beginPath();
+  ctx.moveTo(s.x, s.y + s.h);
+  
+  for (let i = 0; i <= segments; i++) {
+    const x = s.x + i * segmentWidth;
+    const y = s.y + (i % 2 === 0 ? 0 : s.h * 0.3);
+    ctx.lineTo(x, y);
+  }
+  
+  ctx.lineTo(s.x + s.w, s.y + s.h);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Add crystal facets
+  ctx.strokeStyle = '#ffffff44';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < segments; i++) {
+    const x = s.x + i * segmentWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, s.y + s.h);
+    ctx.lineTo(x, s.y + (i % 2 === 0 ? 0 : s.h * 0.3));
+    ctx.stroke();
+  }
+}
+
+function drawWoodPlatform(s) {
+  // Wooden platform with grain
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  
+  // Add wood grain lines
+  ctx.strokeStyle = '#8b451322';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const x = s.x + (i + 1) * (s.w / 9);
+    ctx.beginPath();
+    ctx.moveTo(x, s.y);
+    ctx.lineTo(x, s.y + s.h);
+    ctx.stroke();
+  }
+  
+  // Add wood knots
+  ctx.fillStyle = '#8b451344';
+  for (let i = 0; i < 3; i++) {
+    const x = s.x + 20 + i * (s.w / 4);
+    const y = s.y + s.h / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawGrassPlatform(s) {
+  // Grass platform with organic feel
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  
+  // Add grass tufts
+  ctx.fillStyle = '#228b22';
+  for (let i = 0; i < 12; i++) {
+    const x = s.x + 10 + i * (s.w / 13);
+    const height = 3 + Math.random() * 4;
+    ctx.fillRect(x, s.y - height, 2, height);
+  }
+  
+  // Add soil texture
+  ctx.fillStyle = '#654321';
+  ctx.fillRect(s.x, s.y + s.h - 3, s.w, 3);
+}
+
+function drawIcePlatform(s) {
+  // Translucent ice platform
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = s.color;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  ctx.globalAlpha = 1;
+  
+  // Add ice cracks
+  ctx.strokeStyle = '#ffffff66';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const startX = s.x + Math.random() * s.w;
+    const startY = s.y + Math.random() * s.h;
+    const endX = startX + (Math.random() - 0.5) * 20;
+    const endY = startY + (Math.random() - 0.5) * 20;
+    
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+  }
+}
+
+function drawGoldPlatform(s) {
+  // Metallic gold platform with shine
+  const gradient = ctx.createLinearGradient(s.x, s.y, s.x, s.y + s.h);
+  gradient.addColorStop(0, '#ffd700');
+  gradient.addColorStop(0.5, '#ffed4e');
+  gradient.addColorStop(1, '#b8860b');
+  
+  ctx.fillStyle = gradient;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  
+  // Add metallic shine
+  ctx.fillStyle = '#ffffff44';
+  ctx.fillRect(s.x, s.y, s.w, s.h * 0.3);
+  
+  // Add gold texture
+  ctx.strokeStyle = '#b8860b44';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = s.y + (i + 1) * (s.h / 5);
+    ctx.beginPath();
+    ctx.moveTo(s.x, y);
+    ctx.lineTo(s.x + s.w, y);
+    ctx.stroke();
+  }
+}
+
+function drawDefaultPlatform(s) {
+  // Simple default platform
+  ctx.fillRect(s.x, s.y, s.w, s.h);
 }
 
 function drawHazards() {
@@ -1184,3 +1448,66 @@ window.addEventListener('keydown', (e) => {
 });
 btnResume?.addEventListener('click', () => setPaused(false));
 btnQuit?.addEventListener('click', () => { setPaused(false); state = 'menu'; menu.classList.remove('hidden'); });
+
+// Improved sleek jump VFX
+function spawnPuff(x, y, color, count=8) {
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const speed = randRange(40, 80);
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed - randRange(20, 40);
+    
+    particles.push({ 
+      x, y, 
+      vx, vy, 
+      life: 0.4, 
+      maxLife: 0.4, 
+      color: color + 'cc', 
+      size: randRange(2, 4), 
+      rot: Math.random() * Math.PI, 
+      rotV: randRange(-2, 2), 
+      type: 'puff', 
+      drag: 0.95, 
+      grav: 600 
+    });
+  }
+}
+
+// New sleek impact VFX when bullets hit players
+function spawnImpact(x, y, color, damage) {
+  // Small, colorful impact particles
+  const count = Math.min(6, Math.floor(damage / 10) + 2);
+  
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const speed = randRange(30, 60);
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    particles.push({ 
+      x, y, 
+      vx, vy, 
+      life: 0.3, 
+      maxLife: 0.3, 
+      color: color + 'ff', 
+      size: randRange(1, 3), 
+      rot: 0, 
+      rotV: 0, 
+      type: 'impact', 
+      drag: 0.9, 
+      grav: 400 
+    });
+  }
+  
+  // Small impact ring
+  rings.push({ 
+    x, y, 
+    t: 0, 
+    d: 0.15, 
+    r: 8, 
+    color: color + '88' 
+  });
+  
+  // Subtle screen shake based on damage
+  addShake(Math.min(0.08, damage / 200));
+}
