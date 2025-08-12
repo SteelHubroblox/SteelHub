@@ -925,11 +925,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const RARITY = { Common: 'Common', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary', Secret: 'Secret' };
   const RARITY_WEIGHTS = [
-    { r: RARITY.Common, w: 0.60 },
-    { r: RARITY.Rare, w: 0.20 },
-    { r: RARITY.Epic, w: 0.10 },
-    { r: RARITY.Legendary, w: 0.07 },
-    { r: RARITY.Secret, w: 0.03 },
+    { r: RARITY.Common, w: 0.75 },
+    { r: RARITY.Rare, w: 0.15 },
+    { r: RARITY.Epic, w: 0.06 },
+    { r: RARITY.Legendary, w: 0.03 },
+    { r: RARITY.Secret, w: 0.01 },
   ];
   const RARITY_COLOR = { Common: '#9aa6b2', Rare: '#53b3f3', Epic: '#c77dff', Legendary: '#ffd166', Secret: '#ff6bd6' };
 
