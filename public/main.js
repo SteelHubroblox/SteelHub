@@ -342,6 +342,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (gameMode === 'vsAI') {
       const difficulty = document.getElementById('difficulty').value;
       setDifficulty(difficulty);
+      // Reset series counters at the start of a new AI game
+      seriesRoundIndex = 1; scores = [0,0]; roundWins = [0,0];
+      isOnline = false;
       state = 'playing';
       bullets = [];
       particles.length = 0;
@@ -357,7 +360,8 @@ document.addEventListener('DOMContentLoaded', function() {
         pauseButton.classList.add('mobile');
       }
     } else if (gameMode === 'online') {
-      // For now, start with AI but track as online
+      // Reset series counters at the start of online game
+      seriesRoundIndex = 1; scores = [0,0]; roundWins = [0,0];
       state = 'playing';
       bullets = [];
       particles.length = 0;
@@ -1447,11 +1451,12 @@ const ALL_CARDS = [
     // Freeze simulation explicitly during draft
     state = 'between';
     paused = true;
-    doDraftFor(firstPickerIdx, () => doDraftFor(firstPickerIdx === 0 ? 1 : 0, () => {
+    // Only the loser (firstPickerIdx) drafts an ability
+    doDraftFor(firstPickerIdx, () => {
       draftOverlay.classList.add('hidden');
       paused = false;
       doStartMatch();
-    }));
+    });
   }
 
   function doDraftFor(playerIdx, done) {
@@ -1517,9 +1522,9 @@ const ALL_CARDS = [
     if (!target) return false;
     // Simple check: head not blocked and close enough horizontally to land on top area
     const cx = p.x + p.w/2;
-    const targetLeft = target.x - 6, targetRight = target.x + target.w + 6;
-    if (cx < targetLeft - 24) return false;
-    if (cx > targetRight + 24) return false;
+    const targetLeft = target.x - 20, targetRight = target.x + target.w + 20;
+    if (cx < targetLeft - 60) return false;
+    if (cx > targetRight + 60) return false;
     if (headBlocked(p)) return false;
     return true;
   }
@@ -2502,5 +2507,49 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
   // Ensure logout button is wired
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => { logout(); });
+  }
+
+  function wsUrl(){
+    // Allow override via query ?ws=wss://host/ws or localStorage.wsEndpoint
+    const qs = new URLSearchParams(window.location.search);
+    const qws = qs.get('ws');
+    const stored = localStorage.getItem('wsEndpoint');
+    if (qws) return qws;
+    if (stored) return stored;
+    const loc = window.location;
+    const proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+    return proto + '//' + loc.host + '/ws';
+  }
+
+  function connectOnline(){
+    try {
+      ws = new WebSocket(wsUrl());
+    } catch (e) {
+      console.error('WS connect error', e);
+      showNoPlayersFound();
+      return;
+    }
+    ws.addEventListener('open', ()=>{ wsReady = true; ws.send(JSON.stringify({type:'queue'})); });
+    ws.addEventListener('message', (ev)=>{
+      let msg; try { msg = JSON.parse(ev.data); } catch {}
+      if (!msg) return;
+      if (msg.type === 'match'){
+        netRole = msg.role === 1 ? 'p2' : 'p1';
+        // Configure opponent as online-controlled
+        players[1].controls = { online: true };
+        // Ensure AI is not controlling the opponent
+        // (player[1] reset happens in doStartMatch)
+         // hide matchmaking and start
+        const mm = document.getElementById('matchmakingOverlay'); if (mm) mm.classList.add('hidden');
+        doStartMatch();
+      } else if (msg.type === 'state'){
+        // apply remote state to opponent (players[1])
+        const op = players[1];
+        if (msg.s){ op.x = msg.s.x; op.y = msg.s.y; op.vx = msg.s.vx; op.vy = msg.s.vy; op.hp = msg.s.hp; op.facing = msg.s.facing; op.ammoInMag = msg.s.ammoInMag; }
+      } else if (msg.type === 'bullet'){
+        const op = players[1];
+        const b = msg.b; if (b) bullets.push(new Bullet(op, b.x, b.y, b.vx, b.vy, op.bulletDmg, op.color));
+      }
+    });
   }
 }); // End of DOMContentLoaded event listener
