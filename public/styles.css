@@ -85,3 +85,5 @@ canvas { display: block; }
 /* Leaderboard tab visibility */
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+
+.hidden { display: none !important; }
