@@ -132,6 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Terminate game: reset state and clear world so AI doesn't keep animating
     state = 'menu';
+    paused = false;
     bullets = [];
     particles.length = 0;
     trails.length = 0;
@@ -158,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function logout() {
     currentUser = null;
     localStorage.removeItem('currentUser');
-    showMainMenu(); // Changed from showAuthOverlay to showMainMenu
+    showMainMenu();
   }
 
   // Load player rank from localStorage
@@ -1443,8 +1444,12 @@ const ALL_CARDS = [
 
   function openDraft(firstPickerIdx) {
     draftOverlay.classList.remove('hidden');
+    // Freeze simulation explicitly during draft
+    state = 'between';
+    paused = true;
     doDraftFor(firstPickerIdx, () => doDraftFor(firstPickerIdx === 0 ? 1 : 0, () => {
       draftOverlay.classList.add('hidden');
+      paused = false;
       doStartMatch();
     }));
   }
@@ -2494,4 +2499,8 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
   // Start the game loop
   loop();
   
+  // Ensure logout button is wired
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => { logout(); });
+  }
 }); // End of DOMContentLoaded event listener
