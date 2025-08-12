@@ -1339,6 +1339,31 @@ document.addEventListener('DOMContentLoaded', function() {
         platforms.push({ x: w*0.72, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
         addMovingPlat(w*0.3, top3, 180, ph, 120, 0, 0.7);
         addCrumblePlat(w*0.65, top1, 180, ph, 0.5, 2.0);
+      } else if (idx === 6) {
+        // Twin towers with elevators
+        addMovingPlat(w*0.25, top2, 180, ph, 0, 90, 0.9);
+        addMovingPlat(w*0.75-180, top2, 180, ph, 0, -90, 0.9);
+        platforms.push({ x: w*0.45, y: top3, w: 220, h: ph, active:true, shape:'gold' });
+        addSpikeRowSafe(0, groundY - 16, w*0.15, 16);
+        addSpikeRowSafe(w*0.85, groundY - 16, w*0.15, 16);
+      } else if (idx === 7) {
+        // Cascade steps and mid bridge
+        platforms.push({ x: w*0.1, y: top3, w: 160, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.3, y: top2, w: 200, h: ph, active:true, shape:'wood' });
+        platforms.push({ x: w*0.55, y: top1, w: 240, h: ph, active:true, shape:'grass' });
+        platforms.push({ x: w*0.35, y: top3+40, w: 300, h: ph, active:true, shape:'crystal' });
+      } else if (idx === 8) {
+        // Central arena with side lifts
+        platforms.push({ x: w*0.2, y: top2, w: 220, h: ph, active:true, shape:'ice' });
+        platforms.push({ x: w*0.6, y: top2, w: 220, h: ph, active:true, shape:'ice' });
+        addMovingPlat(w*0.4, top3, 200, ph, 120, 0, 0.8);
+        addMovingPlat(w*0.4, top1, 200, ph, -120, 0, 0.8);
+      } else if (idx === 9) {
+        // Pyramid core with high perch
+        platforms.push({ x: w*0.15, y: top1, w: 200, h: ph, active:true, shape:'gold' });
+        platforms.push({ x: w*0.35, y: top2, w: 240, h: ph, active:true, shape:'crystal' });
+        platforms.push({ x: w*0.6, y: top3, w: 200, h: ph, active:true, shape:'rounded' });
+        addCrumblePlat(w*0.5-100, top1+30, 200, ph, 0.6, 2.2);
       } else {
         // Fallback mirrors first layout
         platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
@@ -1487,6 +1512,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
           } else {
           seriesRoundIndex++;
+          // Rotate map per round
+          currentArena = (currentArena + 1) % ARENA_COUNT;
           // Show ROUND result banner before draft
           showBanner(winnerIdx === 0 ? 'ROUND WON' : 'ROUND LOST', winnerIdx === 0 ? 'win' : 'loss', 1200);
           state = 'between'; paused = true;
@@ -2030,7 +2057,12 @@ document.addEventListener('DOMContentLoaded', function() {
           const cx = p.x + p.w/2, cy = p.y + p.h/2; const d2 = (cx - e.x)**2 + (cy - e.y)**2;
           const radius = 80 + 20 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
           const dmgBase = 20 + 8 * Math.max(0, (e.owner.explosiveLevel||1) - 1);
-          if (d2 < radius*radius) { p.hp -= dmgBase * dt * 4; }
+          if (d2 < radius*radius) {
+            if (!(p.invuln && p.invuln>0)) p.hp -= dmgBase * dt * 4;
+            if (p.thorns && p.thorns>0 && e.owner && e.owner!==p) {
+              if (!(e.owner.invuln && e.owner.invuln>0)) { e.owner.hp -= Math.max(1, Math.round((dmgBase * p.thorns) * dt * 4)); spawnRing(e.owner.x + e.owner.w/2, e.owner.y + e.owner.h*0.4, '#ff6b6b', 0.15, 10); }
+            }
+          }
         }
       }
 
