@@ -130,6 +130,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Hide pause button when returning to menu
     pauseButton.classList.add('hidden');
     
+    // Terminate game: reset state and clear world so AI doesn't keep animating
+    state = 'menu';
+    bullets = [];
+    particles.length = 0;
+    trails.length = 0;
+    muzzleFlashes.length = 0;
+    rings.length = 0;
+    explosions.length = 0;
+    hazards = [];
+    platforms = [];
+    
     // Update user info display
     if (currentUser) {
       currentUsername.textContent = currentUser.username;
@@ -460,8 +471,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Authentication form event listeners
-        document.getElementById('loginBtn').addEventListener('click', handleLogin);
-        document.getElementById('signupBtn').addEventListener('click', handleSignup);
+        document.getElementById('loginBtn').addEventListener('click', (e)=>{ e.preventDefault(); handleLogin(); });
+        document.getElementById('signupBtn').addEventListener('click', (e)=>{ e.preventDefault(); handleSignup(); });
         document.getElementById('showSignupBtn').addEventListener('click', () => {
           loginForm.classList.add('hidden');
           signupForm.classList.remove('hidden');
@@ -1224,7 +1235,7 @@ const ALL_CARDS = [
     const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step; const top4 = top3 - step;
     const ph = 18;
     // Ground
-    platforms.push({ x: 0, y: groundY, w, h: 60, active: true, type:'ground' });
+    platforms.push({ x: 0, y: groundY, w, h: 60, active: true, type:'ground', color: '#2a2a2a' });
 
     // define spawn-safe zones on ground to avoid spike placement
     const SPAWN_SAFE_W = 220;
@@ -1357,6 +1368,26 @@ const ALL_CARDS = [
   let shakeT = 0;
   function addShake(s) { shakeT = Math.min(0.3, shakeT + s); }
 
+  // Simple banner overlay (DOM) for round/match messages
+  let bannerDiv = null; let bannerTimeout = null;
+  function showBanner(text, theme='default', ms=1400) {
+    if (!bannerDiv) {
+      bannerDiv = document.createElement('div');
+      Object.assign(bannerDiv.style, { position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center', zIndex:'60', pointerEvents:'none' });
+      const inner = document.createElement('div');
+      inner.id = 'bannerInner';
+      Object.assign(inner.style, { padding:'14px 22px', borderRadius:'12px', font:'bold 24px system-ui, sans-serif', color:'#fff', boxShadow:'0 12px 40px rgba(0,0,0,0.45)', border:'1px solid rgba(255,255,255,0.15)', background:'linear-gradient(180deg, rgba(25,29,46,0.9), rgba(16,20,34,0.92))' });
+      bannerDiv.appendChild(inner);
+      document.body.appendChild(bannerDiv);
+    }
+    const inner = bannerDiv.querySelector('#bannerInner');
+    inner.textContent = text;
+    inner.style.color = theme === 'win' ? '#69f0ae' : theme === 'loss' ? '#ff8a80' : '#e9eef5';
+    bannerDiv.style.display = 'flex';
+    if (bannerTimeout) clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(()=>{ bannerDiv.style.display = 'none'; }, ms);
+  }
+
   function endRound(winnerIdx) {
     roundWins[winnerIdx]++;
     const need = Math.ceil(ROUND_BEST_OF / 2);
@@ -1383,12 +1414,14 @@ const ALL_CARDS = [
             // Handle AI game result
             const playerWon = winnerIdx === 0;
             handleGameResult(playerWon);
+            try { const diff = document.getElementById('difficulty')?.value || 'normal'; rewardCoinsAI(diff, playerWon); } catch {}
           }
           
-          // Show main menu
-          showMainMenu();
-          const msg = scores[0] === scores[1] ? 'Series tied! Play again' : `P${scores[0] > scores[1] ? 1 : 2} wins the series!`;
-          
+          // Show MATCH result banner, then return to menu
+          const playerWonSeries = scores[0] > scores[1];
+          showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 1800);
+          setTimeout(()=>{ showMainMenu(); }, 1500);
+
           // Reset series
           scores = [0, 0];
           seriesRoundIndex = 1;
@@ -1396,13 +1429,16 @@ const ALL_CARDS = [
           return;
         } else {
         seriesRoundIndex++;
+        // Show ROUND result banner before draft
+        showBanner(winnerIdx === 0 ? 'ROUND WON' : 'ROUND LOST', winnerIdx === 0 ? 'win' : 'loss', 1200);
         state = 'between';
-        openDraft(winnerIdx === 0 ? 1 : 0); // loser picks first
+        setTimeout(()=>{ openDraft(winnerIdx === 0 ? 1 : 0); }, 1000); // loser picks first
         return;
       }
     }
     // Continue same round (next engagement)
-    doStartMatch();
+    showBanner(winnerIdx === 0 ? 'ROUND WON' : 'ROUND LOST', winnerIdx === 0 ? 'win' : 'loss', 1000);
+    setTimeout(()=>{ doStartMatch(); }, 800);
   }
 
   function openDraft(firstPickerIdx) {
@@ -2010,6 +2046,12 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
     ctx.fillStyle = gr; ctx.fillRect(0, 0, canvas.width, canvas.height);
     drawParallax();
 
+    // If not in-game, do not render world so background is clean
+    if (state !== 'playing' && state !== 'between') {
+      drawVignette();
+      return;
+    }
+
     let sx = 0, sy = 0; if (shakeT > 0) { sx = (Math.random()-0.5)*10*shakeT; sy=(Math.random()-0.5)*10*shakeT; ctx.save(); ctx.translate(sx, sy); }
 
     for (const s of platforms) drawPlatform(s);
@@ -2165,7 +2207,8 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
   function drawGroundPlatform(s) {
     // Stone ground with subtle texture
     const gradient = ctx.createLinearGradient(s.x, s.y, s.x, s.y + s.h);
-    gradient.addColorStop(0, s.color);
+    const baseColor = s.color || (currentPalette && currentPalette.platTop) || '#2a2a2a';
+    gradient.addColorStop(0, baseColor);
     gradient.addColorStop(1, '#1a1a1a');
     
     ctx.fillStyle = gradient;
