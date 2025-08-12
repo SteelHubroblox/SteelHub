@@ -129,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Hide pause button when returning to menu
     pauseButton.classList.add('hidden');
-    
     // Terminate game: reset state and clear world so AI doesn't keep animating
     state = 'menu';
     paused = false;
@@ -154,6 +153,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     loadPlayerRank();
+  }
+
+  // Failsafe: ensure only main menu is visible shortly after load
+  function hideAllOverlaysExceptMain(){
+    authOverlay.classList.add('hidden');
+    gameSettings.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
+    draftOverlay.classList.add('hidden');
+    leaderboardOverlay.classList.add('hidden');
+    // dynamic overlays if present
+    const mm = document.getElementById('matchmakingOverlay'); if (mm) mm.classList.add('hidden');
+    const shop = document.getElementById('shopOverlay'); if (shop) shop.classList.add('hidden');
+    const cust = document.getElementById('customizeOverlay'); if (cust) cust.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
   }
 
   function logout() {
@@ -2507,6 +2520,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show the main menu initially
     showMainMenu();
     
+    // Run a quick failsafe after a tick in case any overlay was left visible
+    setTimeout(hideAllOverlaysExceptMain, 50);
+    
     // Start the game loop
     loop();
     
@@ -2599,4 +2615,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Wire shop/customize buttons
     document.getElementById('shopButton')?.addEventListener('click', openShop);
     document.getElementById('customizeButton')?.addEventListener('click', openCustomization);
+
+    // Expose minimal debug API for console
+    window.gameAPI = {
+      getState: () => state,
+      isPaused: () => paused,
+      showMainMenu,
+      hideGameModeOptions,
+    };
   }); // End of DOMContentLoaded event listener
