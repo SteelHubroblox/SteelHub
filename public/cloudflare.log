@@ -57,3 +57,14 @@ nohup: ignoring input
 {"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T20:00:34Z","message":"Connection terminated"}
 {"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T20:00:53Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
 {"level":"info","event":0,"connection":"2457ffba-52a8-497e-8179-54dd0e47f062","connIndex":0,"location":"iad14","ip":"198.41.200.193","protocol":"quic","time":"2025-08-12T20:00:54Z","message":"Registered tunnel connection"}
+{"level":"error","event":0,"ip":"198.41.200.193","connIndex":0,"error":"context canceled","time":"2025-08-12T21:54:04Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:54:04Z","message":"Retrying connection in up to 1s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:54:05Z","message":"Connection terminated"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:54:20Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"error","event":0,"ip":"198.41.200.193","connIndex":0,"error":"context canceled","time":"2025-08-12T21:54:20Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:54:20Z","message":"Retrying connection in up to 4s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:54:22Z","message":"Connection terminated"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:54:30Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"error","event":0,"ip":"198.41.200.193","connIndex":0,"error":"context canceled","time":"2025-08-12T21:54:30Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:54:30Z","message":"Retrying connection in up to 8s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:54:30Z","message":"Connection terminated"}

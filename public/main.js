@@ -1069,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Define spike helper before buildArena
     function addSpikeRow(x, y, w, h) { hazards.push({ x, y, w, h, type: 'spike' }); }
     function addMovingSaw(x, y, r, dx, dy, speed=1){ hazards.push({ type:'saw', x, y, r, baseX:x, baseY:y, dx, dy, t: Math.random()*Math.PI*2, speed }); }
-    function addBouncePad(x, y, w, h, power=1.3, dirX=0, dirY=-1){ hazards.push({ type:'bounce', x, y, w, h, power, dirX, dirY }); }
+    function addBouncePad(x, y, w, h, power=1.7, dirX=0, dirY=-1){ hazards.push({ type:'bounce', x, y, w, h, power, dirX, dirY }); }
 
     function rectIntersectObj(p, o) { return p.x < o.x + o.w && p.x + p.w > o.x && p.y < o.y + o.h && p.y + p.h > o.y; }
     function playerHitsHazard(p) {
@@ -1453,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function safeRect(r){ return r.x>=8 && r.x+r.w<=w-8 && r.y>=40 && r.y+r.h<=groundY-8; }
         function inSpawnSafe(r){ for (const z of spawnNoSpikeRects){ if (rectsIntersect(r, z)) return true; } return false; }
         // 1) Add a couple of high-air platforms across the map
-        const extraCount = 1 + Math.floor(Math.random()*2); // 1..2
+        const extraCount = 2 + Math.floor(Math.random()*2); // 2..3
         for (let i=0;i<extraCount;i++){
           const pw = Math.round(randRange(150, 240));
           const px = Math.round(randRange(60, w - pw - 60));
@@ -1475,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (inSpawnSafe(r)) return false;
           if (rectAny(r, platforms)) return false;
           if (rectAny(r, hazards)) return false;
-          addBouncePad(r.x, r.y, r.w, r.h, 1.45, 0, -1);
+          addBouncePad(r.x, r.y, r.w, r.h, 1.7, 0, -1);
           padsPlaced++; return true;
         }
         // reachable vertical step based on physics step already computed
@@ -2168,9 +2168,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!p.bounceCd || p.bounceCd<=0){
           const bp = getBouncePad(p);
           if (bp){
-            const power = bp.power || 1.2; const dirX = bp.dirX||0, dirY = bp.dirY||-1;
-            const base = 560 * power;
-            p.vx += dirX * base * 0.25;
+            const power = bp.power || 1.6; const dirX = bp.dirX||0, dirY = bp.dirY||-1;
+            const base = 700 * power;
+            p.vx += dirX * base * 0.3;
             p.vy = Math.min(p.vy, dirY * base); // strong upward impulse
             p.onGround = false; p.jumpsUsed = 0;
             p.bounceCd = 0.2; // brief cooldown so we don't re-trigger every frame
