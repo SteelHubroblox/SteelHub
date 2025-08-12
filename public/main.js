@@ -842,6 +842,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.bounceLevel = 0;
       this.explosiveLevel = 0;
       this.lifesteal = 0;
+      this.thorns = 0;
       this.shieldCooldownMax = 0; this.shieldCooldown = 0; this.shieldCharges = 0; this.shieldCapacity = 0;
       this.aiJumpCd = 0; this.aiOffsetX = 0;
       // mags/reload defaults
@@ -869,6 +870,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.bounceLevel = 0;
       this.explosiveLevel = 0;
       this.lifesteal = 0;
+      this.thorns = 0;
       this.shieldCooldownMax = 0; this.shieldCapacity = 0; this.shieldCharges = Math.min(this.shieldCharges, 0);
 
       // Apply per-level effects
@@ -1467,9 +1469,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show MATCH result banner, then return to menu
             const playerWonSeries = scores[0] > scores[1];
-            showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 2200);
             paused = false;
-            setTimeout(()=>{ showMainMenu(); }, 2000);
+            // Hide overlays while banner displays
+            const prevState = state; state = 'between';
+            showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 2200);
+            setTimeout(()=>{ showMainMenu(); state = 'menu'; }, 2000);
 
             // Reset series
             scores = [0, 0];
@@ -1998,7 +2002,8 @@ document.addEventListener('DOMContentLoaded', function() {
           if (p === b.owner) continue;
           if (rectsIntersect(bb, { x: p.x, y: p.y, w: p.w, h: p.h })) {
             if (p.shieldCharges && p.shieldCharges > 0) { p.shieldCharges--; spawnParticle(b.x, b.y, '#9ad7ff'); bullets.splice(i, 1); break; }
-            p.hp -= b.dmg;
+            if (!(p.invuln && p.invuln>0)) p.hp -= b.dmg;
+            if (p.thorns && p.thorns>0 && b.owner && b.owner!==p) { if (!(b.owner.invuln&&b.owner.invuln>0)) { b.owner.hp -= Math.max(1, Math.round(b.dmg * p.thorns)); spawnRing(b.owner.x + b.owner.w/2, b.owner.y + b.owner.h*0.4, '#ff6b6b', 0.2, 12); } }
             if (b.owner.lifesteal) b.owner.hp = clamp((b.owner.hp||100) + b.owner.lifesteal, 0, b.owner.maxHp||100);
             p.vx += Math.sign(b.vx) * 80; p.vy -= 120;
             // Sleek impact VFX
