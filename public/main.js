@@ -1446,6 +1446,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
+      // Procedural air additions: extra high platforms and smart bouncepads
+      (function addAerialGameplay(){
+        // helper: check rectangle intersects any in list
+        function rectAny(r, list){ for (const a of list){ const ar = a.type? { x:a.x, y:a.y, w:a.w, h:a.h } : a; if (rectsIntersect(r, ar)) return true; } return false; }
+        function safeRect(r){ return r.x>=8 && r.x+r.w<=w-8 && r.y>=40 && r.y+r.h<=groundY-8; }
+        function inSpawnSafe(r){ for (const z of spawnNoSpikeRects){ if (rectsIntersect(r, z)) return true; } return false; }
+        // 1) Add a couple of high-air platforms across the map
+        const extraCount = 1 + Math.floor(Math.random()*2); // 1..2
+        for (let i=0;i<extraCount;i++){
+          const pw = Math.round(randRange(150, 240));
+          const px = Math.round(randRange(60, w - pw - 60));
+          const py = Math.round(top1 - randRange(40, 110)); // above top layer
+          const plat = { x:px, y:py, w:pw, h:ph, active:true, shape: (i%2? 'rounded':'ice') };
+          const rr = { x:px, y:py, w:pw, h:ph };
+          if (!safeRect(rr)) continue;
+          if (rectAny(rr, platforms)) continue;
+          platforms.push(plat);
+          // 30% chance to make it crumble with respawn cues
+          if (Math.random() < 0.30){ Object.assign(plat, { crumble:true, delay:0.9, respawn:3.0, timer:-1, respawnTimer:0 }); }
+        }
+        // 2) Place bouncepads under high platforms that lack a reachable lower step
+        const PAD_W = 56, PAD_H = 16; let padsPlaced = 0;
+        function placePadNear(cx){
+          const x = clamp(Math.round(cx - PAD_W/2), 12, w - PAD_W - 12);
+          const r = { x, y: groundY - PAD_H, w: PAD_W, h: PAD_H };
+          if (!safeRect(r)) return false;
+          if (inSpawnSafe(r)) return false;
+          if (rectAny(r, platforms)) return false;
+          if (rectAny(r, hazards)) return false;
+          addBouncePad(r.x, r.y, r.w, r.h, 1.45, 0, -1);
+          padsPlaced++; return true;
+        }
+        // reachable vertical step based on physics step already computed
+        const reach = step * 1.05;
+        // iterate platforms, find those a lot higher than ground or neighbors
+        const candidates = platforms.filter(p => p.type !== 'ground' && p.y < top2 - 10).sort((a,b)=>a.y-b.y);
+        for (const s of candidates){
+          if (padsPlaced >= 3) break;
+          // check if any platform below within horizontal neighborhood provides a step
+          const sCx = s.x + s.w/2; let hasStep = false;
+          for (const t of platforms){
+            if (t === s || t.type==='ground') continue;
+            const tCx = t.x + t.w/2; const dx = Math.abs(tCx - sCx);
+            const dy = s.y - t.y;
+            if (t.y > s.y) continue; // we want t below s
+            if (dy <= reach * 1.2 && dx <= Math.max(140, s.w*0.8)) { hasStep = true; break; }
+          }
+          if (!hasStep) { placePadNear(sCx); }
+        }
+      })();
+
       setupParallax();
     }
 
