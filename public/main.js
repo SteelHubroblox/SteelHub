@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
     explosions.length = 0;
     hazards = [];
     platforms = [];
+    const menuCoins = document.getElementById('menuCoins'); if (menuCoins) menuCoins.textContent = String(parseInt(localStorage.getItem('coins')||'0',10));
     
     // Update user info display
     if (currentUser) {
@@ -1464,8 +1465,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show MATCH result banner, then return to menu
             const playerWonSeries = scores[0] > scores[1];
-            showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 1800);
-            setTimeout(()=>{ showMainMenu(); }, 1500);
+            showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 2200);
+            setTimeout(()=>{ showMainMenu(); }, 2000);
 
             // Reset series
             scores = [0, 0];
@@ -2675,10 +2676,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function collidesAABB(r){ for (const s of platforms){ if (!s.active) continue; if (r.x < s.x + s.w && r.x + r.w > s.x && r.y < s.y + s.h && r.y + r.h > s.y){ return true; } } return false; }
     function spawnMeteor(x,y){ spawnExplosion(x,y,{ color:'#ffa94d', explosiveLevel:2 }); }
     function activateAbility(p, id){
-      if (id==='dash'){ p.vx += (p.facing||1) * 420; return true; }
+      if (id==='dash'){ const dir=(p.facing||1); p.vx = dir * Math.max(Math.abs(p.vx), 520); spawnRing(p.x+p.w/2 + dir*12, p.y+p.h*0.35, '#86ffc1', 0.25, 16); return true; }
       if (id==='blink'){ const dist=160; const nx=p.x + (p.facing||1)*dist; const test={ x:nx,y:p.y,w:p.w,h:p.h }; if (!collidesAABB(test)){ p.x = nx; return true; } return false; }
-      if (id==='phase'){ p.invuln = Math.max(p.invuln||0, 1.5); return true; }
-      if (id==='meteor'){ const tx = p.x + (p.facing||1)*220; const ty = p.y; spawnMeteor(tx, ty); return true; }
+      if (id==='phase'){ p.invuln = Math.max(p.invuln||0, 1.5); spawnRing(p.x+p.w/2, p.y+p.h*0.5, '#9ad7ff', 0.6, 22); return true; }
+      if (id==='meteor'){ const tx = p.x + (p.facing||1)*220; const ty = p.y; spawnMeteor(tx, ty); spawnRing(tx, ty, '#ffa94d', 0.4, 26); return true; }
       if (id==='timewarp'){ p.timewarp = Math.max(p.timewarp||0, 2.5); return true; }
       return false;
     }
