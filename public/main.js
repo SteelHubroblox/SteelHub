@@ -1302,11 +1302,13 @@ const ALL_CARDS = [
       platforms.push({ x: w * 0.55, y: top2 - 10, w: 220, h: ph, active: true, shape:'rounded' });
     }
 
-    // Optionally place spikes on a subset of platforms (avoid ground)
+    // Optionally place spikes on a smaller subset of platforms (avoid ground)
     for (const s of platforms) {
       if (s.type === 'ground') continue;
-      if (Math.random() < 0.22) {
-        hazards.push({ x: s.x + 8, y: s.y - 10, w: Math.max(0, s.w - 16), h: 10, type: 'spike' });
+      if (Math.random() < 0.10) {
+        const segW = Math.max(60, s.w * 0.4);
+        const start = s.x + (s.w - segW) * Math.random();
+        hazards.push({ x: start, y: s.y - 10, w: segW, h: 10, type: 'spike' });
       }
     }
 
@@ -2552,4 +2554,45 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
       }
     });
   }
+
+  // Coins and simple shop/customize overlays
+  let coins = parseInt(localStorage.getItem('coins') || '0', 10);
+  function addCoins(amount) { coins = Math.max(0, coins + amount); localStorage.setItem('coins', String(coins)); const lab=document.getElementById('coinsLabel'); if (lab) lab.textContent = String(coins); }
+  function openShop() {
+    let overlay = document.getElementById('shopOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id='shopOverlay'; overlay.className='overlay';
+      overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Shop</div><div>Coins: <span id="coinsLabel"></span></div><div class="menu-sub" style="margin-top:10px;">Cosmetics</div><div id="cosmetics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div class="menu-sub">Ability Packs</div><div id="packs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeShop" class="primary">Close</button></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#closeShop').onclick = () => overlay.remove();
+    }
+    document.getElementById('coinsLabel').textContent = String(coins);
+    const cosmetics = [{id:'skin_red',name:'Red Skin'},{id:'hat_crown',name:'Crown'},{id:'trail_fire',name:'Fire Trail'}];
+    const grid = document.getElementById('cosmetics'); grid.innerHTML='';
+    const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
+    for (const c of cosmetics){ const el=document.createElement('div'); el.className='card'; const o=owned.has(c.id); el.innerHTML=`<div class="card-title">${c.name}</div><div class="card-desc">150 coins</div><button class="primary" ${o?'disabled':''}>${o?'Owned':'Buy'}</button>`; el.querySelector('button').onclick=()=>{ if(o||coins<150)return; owned.add(c.id); localStorage.setItem('unlockedCosmetics',JSON.stringify([...owned])); addCoins(-150); openShop(); }; grid.appendChild(el);} 
+    const packs = document.getElementById('packs'); packs.innerHTML='';
+    const rarities = [{r:'Common',p:200},{r:'Rare',p:350},{r:'Epic',p:500}];
+    const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities')||'[]'));
+    for (const it of rarities){ const el=document.createElement('div'); el.className='card'; el.innerHTML=`<div class="card-title">${it.r} Ability</div><div class="card-desc">${it.p} coins</div><button class="primary">Buy</button>`; el.querySelector('button').onclick=()=>{ if(coins<it.p)return; addCoins(-it.p); openShop(); }; packs.appendChild(el);} 
+  }
+  function openCustomization(){
+    let overlay = document.getElementById('customizeOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id='customizeOverlay'; overlay.className='overlay';
+      overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Customization</div><div class="menu-sub">Select cosmetics you have unlocked in the Shop.</div><div id="custGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeCust" class="primary">Close</button></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#closeCust').onclick = () => overlay.remove();
+    }
+    const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
+    const equipped = JSON.parse(localStorage.getItem('equippedCosmetics')||'{}');
+    const OPTIONS = [ { id:'skin_red', name:'Red Skin', slot:'skin' }, { id:'hat_crown', name:'Crown', slot:'hat' }, { id:'trail_fire', name:'Fire Trail', slot:'trail' } ];
+    const grid = document.getElementById('custGrid'); grid.innerHTML='';
+    for (const c of OPTIONS){ const el=document.createElement('div'); el.className='card'; const have = owned.has(c.id); const isEq = equipped[c.slot] === c.id; el.innerHTML = `<div class="card-title">${c.name}</div><div class="card-desc">${have? 'Owned' : 'Locked (buy in Shop)'}</div><button class="primary" ${!have? 'disabled':''}>${isEq? 'Equipped' : 'Equip'}</button>`; el.querySelector('button').onclick = ()=>{ if(!have) return; equipped[c.slot]=c.id; localStorage.setItem('equippedCosmetics', JSON.stringify(equipped)); openCustomization(); }; grid.appendChild(el);} 
+  }
+  function _equipped(){ return JSON.parse(localStorage.getItem('equippedCosmetics')||'{}'); }
+
+  // Wire shop/customize buttons
+  document.getElementById('shopButton')?.addEventListener('click', openShop);
+  document.getElementById('customizeButton')?.addEventListener('click', openCustomization);
 }); // End of DOMContentLoaded event listener
