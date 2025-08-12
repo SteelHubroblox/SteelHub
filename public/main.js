@@ -961,24 +961,42 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 'glasscannon', title: 'Glass Cannon', desc: 'Big damage, lower max HP', rarity: RARITY.Epic, icon: '💎' },
   ];
 
+    // Shop-driven ability extensions
+    const ALL_CARDS_BASE = [...ALL_CARDS];
+    const NEW_ABILITIES = [
+      { id: 'dash', title: 'Dash', desc: 'Quick burst of speed on ground and air', rarity: RARITY.Rare, icon: '💨' },
+      { id: 'walljump', title: 'Wall Jump', desc: 'Jump off walls for extra mobility', rarity: RARITY.Epic, icon: '🧱' },
+      { id: 'homing', title: 'Homing Bullets', desc: 'Bullets slightly home in on foes', rarity: RARITY.Epic, icon: '🧲' },
+      { id: 'blink', title: 'Blink', desc: 'Short-range teleport with cooldown', rarity: RARITY.Legendary, icon: '🌀' },
+      { id: 'thorns', title: 'Thorns', desc: 'Return a portion of damage to attacker', rarity: RARITY.Rare, icon: '🌵' },
+      { id: 'phase', title: 'Phase Shift', desc: 'Brief invulnerability window', rarity: RARITY.Secret || 'Legendary', icon: '🛡️' },
+      { id: 'arc', title: 'Arc Shot', desc: 'Bullets arc more with gravity', rarity: RARITY.Common, icon: '〽️' },
+      { id: 'splash', title: 'Splash Damage', desc: 'Small AoE on bullet impact', rarity: RARITY.Rare, icon: '💥' },
+      { id: 'slow', title: 'Cryo Rounds', desc: 'Hits slow enemy movement briefly', rarity: RARITY.Epic, icon: '❄️' },
+    ];
+    function getDraftableCards(){
+      const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities') || '[]'));
+      const extras = NEW_ABILITIES.filter(a => unlocked.has(a.id));
+      return [...ALL_CARDS_BASE, ...extras];
+    }
     function generateDraftPool(forPlayer) {
+      const available = getDraftableCards();
       const pool = [];
       const used = new Set();
       for (let i = 0; i < 3; i++) {
         const rarity = weightedRarity();
-        const candidates = ALL_CARDS.filter(c => c.rarity === rarity && !used.has(c.id))
+        const candidates = available.filter(c => c.rarity === rarity && !used.has(c.id))
           .filter(c => (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
-        if (candidates.length === 0) continue;
+        if (!candidates.length) continue;
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
         used.add(pick.id);
         const nextLevel = (forPlayer.levels[pick.id] || 0) + 1;
         pool.push({ card: pick, nextLevel });
       }
-      // If pool underfilled, backfill with any rarity
       while (pool.length < 3) {
-        const rem = ALL_CARDS.filter(c => !pool.find(p => p.card.id === c.id) && (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
+        const rem = available.filter(c => !pool.find(p => p.card.id === c.id) && (forPlayer.levels[c.id] || 0) < MAX_LEVEL);
         if (!rem.length) break;
-        const pick = rem[Math.floor(Math.random() * candidates.length)];
+        const pick = rem[Math.floor(Math.random() * rem.length)];
         pool.push({ card: pick, nextLevel: (forPlayer.levels[pick.id] || 0) + 1 });
       }
       return pool;
@@ -1438,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', function() {
               // Handle AI game result
               const playerWon = winnerIdx === 0;
               handleGameResult(playerWon);
-              try { const diff = document.getElementById('difficulty')?.value || 'normal'; rewardCoinsAI(diff, playerWon); } catch {}
+              rewardCoinsAI(playerWon);
             }
             
             // Show MATCH result banner, then return to menu
@@ -2582,9 +2600,10 @@ document.addEventListener('DOMContentLoaded', function() {
       let overlay = document.getElementById('shopOverlay');
       if (!overlay) {
         overlay = document.createElement('div'); overlay.id='shopOverlay'; overlay.className='overlay';
-        overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Shop</div><div>Coins: <span id="coinsLabel"></span></div><div class="menu-sub" style="margin-top:10px;">Cosmetics</div><div id="cosmetics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div class="menu-sub">Ability Packs</div><div id="packs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeShop" class="primary">Close</button></div></div>';
+        overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Shop</div><div>Coins: <span id="coinsLabel"></span></div><div class="menu-row"><button id="watchAd" class="secondary">Watch Ad (+25)</button></div><div class="menu-sub" style="margin-top:10px;">Cosmetics</div><div id="cosmetics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div class="menu-sub">Ability Packs</div><div id="packs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeShop" class="primary">Close</button></div></div>';
         document.body.appendChild(overlay);
         overlay.querySelector('#closeShop').onclick = () => overlay.remove();
+        overlay.querySelector('#watchAd').onclick = () => { addCoins(25); openShop(); };
       }
       document.getElementById('coinsLabel').textContent = String(coins);
       const cosmetics = [{id:'skin_red',name:'Red Skin'},{id:'hat_crown',name:'Crown'},{id:'trail_fire',name:'Fire Trail'}];
@@ -2592,9 +2611,9 @@ document.addEventListener('DOMContentLoaded', function() {
       const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
       for (const c of cosmetics){ const el=document.createElement('div'); el.className='card'; const o=owned.has(c.id); el.innerHTML=`<div class="card-title">${c.name}</div><div class="card-desc">150 coins</div><button class="primary" ${o?'disabled':''}>${o?'Owned':'Buy'}</button>`; el.querySelector('button').onclick=()=>{ if(o||coins<150)return; owned.add(c.id); localStorage.setItem('unlockedCosmetics',JSON.stringify([...owned])); addCoins(-150); openShop(); }; grid.appendChild(el);} 
       const packs = document.getElementById('packs'); packs.innerHTML='';
-      const rarities = [{r:'Common',p:200},{r:'Rare',p:350},{r:'Epic',p:500}];
+      const rarities = [{r:RARITY.Common,p:200},{r:RARITY.Rare,p:350},{r:RARITY.Epic,p:500},{r:RARITY.Legendary,p:700}];
       const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities')||'[]'));
-      for (const it of rarities){ const el=document.createElement('div'); el.className='card'; el.innerHTML=`<div class="card-title">${it.r} Ability</div><div class="card-desc">${it.p} coins</div><button class="primary">Buy</button>`; el.querySelector('button').onclick=()=>{ if(coins<it.p)return; addCoins(-it.p); openShop(); }; packs.appendChild(el);} 
+      for (const it of rarities){ const el=document.createElement('div'); el.className='card'; el.innerHTML=`<div class="card-title" style="color:${RARITY_COLOR[it.r]}">${it.r} Ability</div><div class="card-desc">${it.p} coins</div><button class="primary">Buy</button>`; el.querySelector('button').onclick=()=>{ if(coins<it.p)return; const pool=NEW_ABILITIES.filter(a=>a.rarity===it.r && !unlocked.has(a.id)); if(!pool.length)return; const pick=pool[Math.floor(Math.random()*pool.length)]; unlocked.add(pick.id); localStorage.setItem('unlockedAbilities',JSON.stringify([...unlocked])); addCoins(-it.p); openShop(); }; packs.appendChild(el);} 
     }
     function openCustomization(){
       let overlay = document.getElementById('customizeOverlay');

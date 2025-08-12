@@ -21,3 +21,8 @@
 {"level":"info","time":"2025-08-12T18:30:35Z","message":"Starting metrics server on 127.0.0.1:20244/metrics"}
 {"level":"info","event":0,"ip":"198.41.200.13","connIndex":0,"time":"2025-08-12T18:30:35Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
 {"level":"info","event":0,"connection":"f298534e-d821-4ba8-b0e4-3c362044bcaa","connIndex":0,"location":"iad12","ip":"198.41.200.13","protocol":"quic","time":"2025-08-12T18:30:36Z","message":"Registered tunnel connection"}
+{"level":"error","event":0,"ip":"198.41.200.13","connIndex":0,"error":"context canceled","time":"2025-08-12T20:00:32Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.200.13","connIndex":0,"time":"2025-08-12T20:00:32Z","message":"Retrying connection in up to 1s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T20:00:33Z","message":"Connection terminated"}
+{"level":"info","event":0,"ip":"198.41.200.13","connIndex":0,"time":"2025-08-12T20:00:48Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"info","event":0,"connection":"aaa7b9bf-9c7e-47d8-8bd3-7b3d08fe1027","connIndex":0,"location":"iad14","ip":"198.41.200.13","protocol":"quic","time":"2025-08-12T20:00:48Z","message":"Registered tunnel connection"}
