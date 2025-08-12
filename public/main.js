@@ -855,6 +855,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.burstLevel = this.burstLevel || 0; this.burstCount = 1; this.burstShotsLeft = 0; this.burstTimer = 0; this.burstInterval = 0.08;
       this.pellets = 0;
       this.applyCards();
+      this.lastTrailT = 0;
     }
     applyCards() {
       // Reset to base first
@@ -1467,7 +1468,8 @@ document.addEventListener('DOMContentLoaded', function() {
               // Handle AI game result
               const playerWon = winnerIdx === 0;
               handleGameResult(playerWon);
-              rewardCoinsAI(playerWon);
+              // Inline coins reward to avoid missing function references
+              addCoins(playerWon ? 8 : 1);
             }
             
             // Show MATCH result banner, then return to menu
@@ -2098,7 +2100,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Drawing polish: player head
     function drawPlayer(p) {
-      const eq = (typeof _equipped==='function') ? _equipped() : {};
+      const eq = (typeof _equipped==='function' && p.idx===0) ? _equipped() : {};
       // hp bar
       ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 25, p.w + 4, 6, 3); ctx.fill();
       ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 25, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
@@ -2121,8 +2123,14 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!p.controls.ai) { aimX = mouseX - gx; aimY = mouseY - gy; } else { const enemy = players[0]; aimX = (enemy.x+enemy.w/2)-gx; aimY = (enemy.y+enemy.h*0.4)-gy; }
       const n = Math.hypot(aimX, aimY) || 1; aimX/=n; aimY/=n;
       drawGunAt(gx, gy, aimX, aimY, 22, 4);
-      // trail
-      if (eq.trail === 'trail_fire' && (Math.abs(p.vx) + Math.abs(p.vy) > 60)) { trails.push({ x: p.x + p.w/2, y: p.y + p.h, life: 0.25, color: 'rgba(255,120,40,0.8)' }); }
+      // subtle, rate-limited trail for local player only
+      if (p.idx===0 && eq.trail === 'trail_fire' && (Math.abs(p.vx) + Math.abs(p.vy) > 60)) {
+        p.lastTrailT = p.lastTrailT || 0;
+        if (simTime - p.lastTrailT > 0.08) {
+          trails.push({ x: p.x + p.w/2, y: p.y + p.h, life: 0.18, color: 'rgba(255,120,40,0.35)' });
+          p.lastTrailT = simTime;
+        }
+      }
       // hat
       if (eq.hat === 'hat_crown') { ctx.fillStyle = '#ffd54f'; ctx.beginPath(); const cx=p.x+p.w/2, cy=p.y-22; const w=20,h=10; ctx.moveTo(cx - w/2, cy + h); ctx.lineTo(cx - w/4, cy); ctx.lineTo(cx, cy + h); ctx.lineTo(cx + w/4, cy); ctx.lineTo(cx + w/2, cy + h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='#000'; ctx.stroke(); }
     }
