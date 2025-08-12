@@ -1057,12 +1057,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Define spike helper before buildArena
     function addSpikeRow(x, y, w, h) { hazards.push({ x, y, w, h, type: 'spike' }); }
+    function addMovingSaw(x, y, r, dx, dy, speed=1){ hazards.push({ type:'saw', x, y, r, baseX:x, baseY:y, dx, dy, t: Math.random()*Math.PI*2, speed }); }
 
     function rectIntersectObj(p, o) { return p.x < o.x + o.w && p.x + p.w > o.x && p.y < o.y + o.h && p.y + p.h > o.y; }
     function playerHitsHazard(p) {
       const bbox = { x: p.x, y: p.y, w: p.w, h: p.h };
-      for (const hz of hazards) { if (rectIntersectObj(bbox, hz)) return true; }
+      for (const hz of hazards) {
+        if (hz.type === 'spike') { if (rectIntersectObj(bbox, hz)) return true; }
+        else if (hz.type === 'saw') {
+          const cx = p.x + p.w/2, cy = p.y + p.h/2; const dx = cx - hz.x, dy = cy - hz.y; if (dx*dx + dy*dy <= (hz.r+10)*(hz.r+10)) return true;
+        }
+      }
       return false;
+    }
+    function updateHazards(dt){
+      for (const hz of hazards){ if (hz.type==='saw'){ hz.t += dt * (hz.speed||1); hz.x = hz.baseX + Math.sin(hz.t) * (hz.dx||0); hz.y = hz.baseY + Math.cos(hz.t) * (hz.dy||0); } }
     }
 
     // Added: prevent spikes near spawn zones and optionally add spikes on some platforms
@@ -1296,50 +1305,45 @@ document.addEventListener('DOMContentLoaded', function() {
       ];
 
       if (idx === 0) {
-        platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
-        addMovingPlat(w * 0.62, top1 - 10, 240, ph, 120, 0, 0.8);
-        platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true, shape:'rounded' });
-        addCrumblePlat(w * 0.55, top2 - 10, 220, ph, 0.6, 3);
-        platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true, shape:'rounded' });
-        addSpikeRowSafe(0, groundY - 16, 120, 16);
-        addSpikeRowSafe(w - 120, groundY - 16, 120, 16);
+        // Reworked: central bridge, side perches, minimal ground spikes
+        platforms.push({ x: w*0.15, y: top2, w: 200, h: ph, active:true, shape:'wood' });
+        platforms.push({ x: w*0.65, y: top2, w: 200, h: ph, active:true, shape:'wood' });
+        platforms.push({ x: w*0.35, y: top3+30, w: 300, h: ph, active:true, shape:'rounded' });
+        addMovingSaw(w*0.5, top1+20, 18, 120, 0, 0.9);
+        addSpikeRowSafe(0, groundY - 16, w*0.1, 16);
+        addSpikeRowSafe(w*0.9, groundY - 16, w*0.1, 16);
       } else if (idx === 1) {
-        platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true, shape:'grass' });
-        addMovingPlat(w * 0.18, top2 + 10, 240, 14, 140, 0, 1.2);
-        platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true, shape:'wood' });
-        addCrumblePlat(w * 0.38, top3 + 10, 220, 14, 0.5, 2.5);
-        addSpikeRowSafe(w * 0.4, groundY - 16, w * 0.2, 16);
+        // Reworked: long mid deck with moving lifts
+        platforms.push({ x: w*0.1, y: top2+10, w: w*0.8, h: ph, active:true, shape:'grass' });
+        addMovingPlat(w*0.2, top3+5, 180, ph, 0, 90, 1.0);
+        addMovingPlat(w*0.7, top3+5, 180, ph, 0, -90, 1.0);
+        addMovingSaw(w*0.5, top2-50, 16, 0, 80, 1.2);
       } else if (idx === 2) {
-        platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true, shape:'crystal' });
-        addMovingPlat(w * 0.12, top2, 200, ph, 0, 80, 0.9);
-        platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true, shape:'ice' });
-        platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true, shape:'gold' });
-        addCrumblePlat(w * 0.68, top2, 220, ph, 0.7, 2.8);
-        addMovingPlat(w * 0.68, top3, 200, ph, 0, 90, 1.0);
-        platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true, shape:'rounded' });
-        addSpikeRowSafe(w * 0.48, groundY - 16, 100, 16);
+        // Reworked: opposing balconies and a lower bridge
+        platforms.push({ x: w*0.15, y: top1, w: 220, h: ph, active:true, shape:'crystal' });
+        platforms.push({ x: w*0.65, y: top1, w: 220, h: ph, active:true, shape:'crystal' });
+        platforms.push({ x: w*0.35, y: top2+25, w: 300, h: ph, active:true, shape:'ice' });
+        addMovingSaw(w*0.5, top3-10, 14, 120, 0, 1.1);
       } else if (idx === 3) {
-        platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true, shape:'rounded' });
-        addCrumblePlat(w * 0.16, top2 + 10, 260, ph, 0.6, 2.6);
-        platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true, shape:'wood' });
-        addMovingPlat(w * 0.66, top1, 240, ph, 140, 0, 0.8);
-        platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true, shape:'grass' });
-        // no ground spikes here to keep area open
+        // Reworked: staggered steps and crumble mid
+        platforms.push({ x: w*0.2, y: top3+10, w: 200, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.55, y: top2, w: 240, h: ph, active:true, shape:'wood' });
+        addCrumblePlat(w*0.35, top1+5, 260, ph, 0.6, 2.4);
+        addMovingSaw(w*0.75, top1-20, 16, 0, 80, 1.0);
       } else if (idx === 4) {
-        // New: pyramid-style steps
-        platforms.push({ x: w*0.1, y: top3, w: 140, h: ph, active:true, shape:'gold' });
-        platforms.push({ x: w*0.25, y: top2, w: 200, h: ph, active:true, shape:'gold' });
-        platforms.push({ x: w*0.45, y: top1, w: 260, h: ph, active:true, shape:'gold' });
-        addMovingPlat(w*0.7, top2, 220, ph, 0, 80, 0.9);
-        addSpikeRowSafe(w*0.0, groundY-16, w*0.4, 16);
-        addSpikeRowSafe(w*0.6, groundY-16, w*0.4, 16);
+        // Reworked: pyramid steps with central hazard path
+        platforms.push({ x: w*0.1, y: top3, w: 160, h: ph, active:true, shape:'gold' });
+        platforms.push({ x: w*0.3, y: top2, w: 220, h: ph, active:true, shape:'gold' });
+        platforms.push({ x: w*0.55, y: top1, w: 260, h: ph, active:true, shape:'gold' });
+        addMovingSaw(w*0.5, top2+10, 14, 100, 0, 1.2);
       } else if (idx === 5) {
-        // New: floating islands with rounded and crystal
-        platforms.push({ x: w*0.15, y: top1-20, w: 220, h: ph, active:true, shape:'rounded' });
-        platforms.push({ x: w*0.45, y: top2-10, w: 200, h: ph, active:true, shape:'crystal' });
-        platforms.push({ x: w*0.72, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
+        // Reworked: floating islands with a roaming saw
+        platforms.push({ x: w*0.18, y: top1-20, w: 220, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.48, y: top2-10, w: 200, h: ph, active:true, shape:'crystal' });
+        platforms.push({ x: w*0.75, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
         addMovingPlat(w*0.3, top3, 180, ph, 120, 0, 0.7);
         addCrumblePlat(w*0.65, top1, 180, ph, 0.5, 2.0);
+        addMovingSaw(w*0.35, top2, 16, 140, 0, 0.9);
       } else if (idx === 6) {
         // Twin towers with elevators
         addMovingPlat(w*0.25, top2, 180, ph, 0, 90, 0.9);
@@ -1913,6 +1917,7 @@ document.addEventListener('DOMContentLoaded', function() {
       simTime += dt;
       shakeT = Math.max(0, shakeT - dt);
       updatePlatforms(dt);
+      updateHazards(dt);
       updateEnvironment(dt);
 
       // Online tick: send my state ~20Hz
@@ -2519,6 +2524,12 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.lineTo(x0 + step, hz.y + hz.h);
             ctx.closePath(); ctx.fill();
           }
+        } else if (hz.type === 'saw') {
+          ctx.save();
+          ctx.translate(hz.x, hz.y);
+          ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(0,0,hz.r,0,Math.PI*2); ctx.fill();
+          ctx.strokeStyle = '#666'; ctx.lineWidth = 2; for (let k=0;k<8;k++){ const a = (k/8)*Math.PI*2 + hz.t*4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*hz.r, Math.sin(a)*hz.r); ctx.stroke(); }
+          ctx.restore();
         }
       }
     }
