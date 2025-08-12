@@ -1468,6 +1468,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show MATCH result banner, then return to menu
             const playerWonSeries = scores[0] > scores[1];
             showBanner(playerWonSeries ? 'MATCH WON' : 'MATCH LOST', playerWonSeries ? 'win' : 'loss', 2200);
+            paused = false;
             setTimeout(()=>{ showMainMenu(); }, 2000);
 
             // Reset series
@@ -1479,14 +1480,14 @@ document.addEventListener('DOMContentLoaded', function() {
           seriesRoundIndex++;
           // Show ROUND result banner before draft
           showBanner(winnerIdx === 0 ? 'ROUND WON' : 'ROUND LOST', winnerIdx === 0 ? 'win' : 'loss', 1200);
-          state = 'between';
+          state = 'between'; paused = true;
           setTimeout(()=>{ openDraft(winnerIdx === 0 ? 1 : 0); }, 1000); // loser picks first
           return;
         }
       }
       // Continue same round (next engagement)
       showBanner(winnerIdx === 0 ? 'ROUND WON' : 'ROUND LOST', winnerIdx === 0 ? 'win' : 'loss', 1000);
-      setTimeout(()=>{ doStartMatch(); }, 800);
+      setTimeout(()=>{ paused = false; doStartMatch(); }, 800);
     }
 
     function openDraft(firstPickerIdx) {
