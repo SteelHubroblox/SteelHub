@@ -1005,6 +1005,31 @@ const ALL_CARDS = [
     return false;
   }
 
+  // Added: prevent spikes near spawn zones and optionally add spikes on some platforms
+  let spawnNoSpikeRects = [];
+  function addSpikeRowSafe(x, y, w, h) {
+    // Split the row into safe segments excluding spawnNoSpikeRects along the same y band
+    let segments = [[x, x + w]];
+    for (const r of spawnNoSpikeRects) {
+      if (Math.abs((r.y + r.h/2) - (y + h/2)) > 20) continue;
+      const rx0 = r.x, rx1 = r.x + r.w;
+      const next = [];
+      for (const [a, b] of segments) {
+        // no overlap
+        if (b <= rx0 || a >= rx1) { next.push([a, b]); continue; }
+        // left piece
+        if (a < rx0) next.push([a, Math.max(a, rx0)]);
+        // right piece
+        if (b > rx1) next.push([Math.min(b, rx1), b]);
+      }
+      segments = next;
+    }
+    for (const [a, b] of segments) {
+      const ww = Math.max(0, b - a);
+      if (ww > 4) hazards.push({ x: a, y, w: ww, h, type: 'spike' });
+    }
+  }
+
   // Enhanced parallax background with pyramids, mountains, and 3D elements
   const parallaxLayers = [];
   function setupParallax() {
@@ -1199,39 +1224,76 @@ const ALL_CARDS = [
     const top1 = groundY - step; const top2 = top1 - step; const top3 = top2 - step; const top4 = top3 - step;
     const ph = 18;
     // Ground
-    platforms.push({ x: 0, y: groundY, w, h: 60, active: true });
+    platforms.push({ x: 0, y: groundY, w, h: 60, active: true, type:'ground' });
+
+    // define spawn-safe zones on ground to avoid spike placement
+    const SPAWN_SAFE_W = 220;
+    const s1x = w * 0.18 - SPAWN_SAFE_W/2;
+    const s2x = w * 0.82 - SPAWN_SAFE_W/2;
+    spawnNoSpikeRects = [
+      { x: s1x, y: groundY - 16, w: SPAWN_SAFE_W, h: 16 },
+      { x: s2x, y: groundY - 16, w: SPAWN_SAFE_W, h: 16 },
+    ];
+
     if (idx === 0) {
-      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
       addMovingPlat(w * 0.62, top1 - 10, 240, ph, 120, 0, 0.8);
-      platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true });
+      platforms.push({ x: w * 0.10, y: top2, w: 220, h: ph, active: true, shape:'rounded' });
       addCrumblePlat(w * 0.55, top2 - 10, 220, ph, 0.6, 3);
-      platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true });
-      addSpikeRow(0, groundY - 16, 120, 16);
-      addSpikeRow(w - 120, groundY - 16, 120, 16);
+      platforms.push({ x: w * 0.32, y: top3, w: 260, h: ph, active: true, shape:'rounded' });
+      addSpikeRowSafe(0, groundY - 16, 120, 16);
+      addSpikeRowSafe(w - 120, groundY - 16, 120, 16);
     } else if (idx === 1) {
-      platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true });
+      platforms.push({ x: w * 0.05, y: top1, w: w * 0.9, h: 14, active: true, shape:'grass' });
       addMovingPlat(w * 0.18, top2 + 10, 240, 14, 140, 0, 1.2);
-      platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true });
+      platforms.push({ x: w * 0.58, y: top2, w: 280, h: 14, active: true, shape:'wood' });
       addCrumblePlat(w * 0.38, top3 + 10, 220, 14, 0.5, 2.5);
-      addSpikeRow(w * 0.4, groundY - 16, w * 0.2, 16);
+      addSpikeRowSafe(w * 0.4, groundY - 16, w * 0.2, 16);
     } else if (idx === 2) {
-      platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top1, w: 220, h: ph, active: true, shape:'crystal' });
       addMovingPlat(w * 0.12, top2, 200, ph, 0, 80, 0.9);
-      platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true });
-      platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top3, w: 180, h: ph, active: true, shape:'ice' });
+      platforms.push({ x: w * 0.68, y: top1, w: 240, h: ph, active: true, shape:'gold' });
       addCrumblePlat(w * 0.68, top2, 220, ph, 0.7, 2.8);
       addMovingPlat(w * 0.68, top3, 200, ph, 0, 90, 1.0);
-      platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true });
-      addSpikeRow(w * 0.48, groundY - 16, 100, 16);
-    } else {
-      platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true });
+      platforms.push({ x: w * 0.40, y: top2 + 10, w: 260, h: ph, active: true, shape:'rounded' });
+      addSpikeRowSafe(w * 0.48, groundY - 16, 100, 16);
+    } else if (idx === 3) {
+      platforms.push({ x: w * 0.2, y: top1 + 10, w: 200, h: ph, active: true, shape:'rounded' });
       addCrumblePlat(w * 0.16, top2 + 10, 260, ph, 0.6, 2.6);
-      platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true });
+      platforms.push({ x: w * 0.12, y: top3 + 10, w: 320, h: ph, active: true, shape:'wood' });
       addMovingPlat(w * 0.66, top1, 240, ph, 140, 0, 0.8);
-      platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true });
-      addMovingPlat(w * 0.58, top3, 360, ph, 160, 0, 0.6);
-      addSpikeRow(w * 0.45, groundY - 16, w * 0.1, 16);
+      platforms.push({ x: w * 0.62, y: top2, w: 300, h: ph, active: true, shape:'grass' });
+      // no ground spikes here to keep area open
+    } else if (idx === 4) {
+      // New: pyramid-style steps
+      platforms.push({ x: w*0.1, y: top3, w: 140, h: ph, active:true, shape:'gold' });
+      platforms.push({ x: w*0.25, y: top2, w: 200, h: ph, active:true, shape:'gold' });
+      platforms.push({ x: w*0.45, y: top1, w: 260, h: ph, active:true, shape:'gold' });
+      addMovingPlat(w*0.7, top2, 220, ph, 0, 80, 0.9);
+      addSpikeRowSafe(w*0.0, groundY-16, w*0.4, 16);
+      addSpikeRowSafe(w*0.6, groundY-16, w*0.4, 16);
+    } else if (idx === 5) {
+      // New: floating islands with rounded and crystal
+      platforms.push({ x: w*0.15, y: top1-20, w: 220, h: ph, active:true, shape:'rounded' });
+      platforms.push({ x: w*0.45, y: top2-10, w: 200, h: ph, active:true, shape:'crystal' });
+      platforms.push({ x: w*0.72, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
+      addMovingPlat(w*0.3, top3, 180, ph, 120, 0, 0.7);
+      addCrumblePlat(w*0.65, top1, 180, ph, 0.5, 2.0);
+    } else {
+      // Fallback mirrors first layout
+      platforms.push({ x: w * 0.12, y: top1, w: 260, h: ph, active: true, shape:'rounded' });
+      platforms.push({ x: w * 0.55, y: top2 - 10, w: 220, h: ph, active: true, shape:'rounded' });
     }
+
+    // Optionally place spikes on a subset of platforms (avoid ground)
+    for (const s of platforms) {
+      if (s.type === 'ground') continue;
+      if (Math.random() < 0.22) {
+        hazards.push({ x: s.x + 8, y: s.y - 10, w: Math.max(0, s.w - 16), h: 10, type: 'spike' });
+      }
+    }
+
     setupParallax();
   }
 
@@ -1388,91 +1450,88 @@ const ALL_CARDS = [
     const enemy = players[0];
     p.aiJumpCd = Math.max(0, p.aiJumpCd - dt);
     
-    // Simple distance-based movement
+    // Desired spacing
+    const desired = 260;
+    const tooClose = 180;
+    const tooFar = 320;
+
     const dx = (enemy.x + enemy.w/2) - (p.x + p.w/2);
-    const currentDistance = Math.abs(dx);
-    
-    // Basic movement - move towards enemy but keep some distance
-    const wantDir = Math.sign(dx);
-    const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.8;
-    p.vx += wantDir * accel * dt;
-    p.vx = clamp(p.vx, -MAX_VX * 0.8, MAX_VX * 0.8);
-    
-    // Simple jumping logic
-    if (p.onGround && p.aiJumpCd === 0) {
-      let shouldJump = false;
-      
-      // Jump to reach higher platforms when close
-      const upperPlatforms = platforms.filter(s => s.y < p.y - 20 && s.h < 40);
-      for (const platform of upperPlatforms) {
-        const platformCenterX = platform.x + platform.w/2;
-        const distanceToPlatform = Math.abs((p.x + p.w/2) - platformCenterX);
-        if (distanceToPlatform < 100) {
-          shouldJump = true;
-          break;
-        }
-      }
-      
-      // Jump to dodge bullets occasionally
-      if (detectIncomingBullets(p, enemy) && Math.random() < 0.6) {
-        shouldJump = true;
-      }
-      
-      // Jump to avoid hazards
-      if (detectHazardsAhead(p)) {
-        shouldJump = true;
-      }
-      
-      // Jump if too close to enemy
-      if (currentDistance < 80 && Math.random() < 0.4) {
-        shouldJump = true;
-      }
-      
-      if (shouldJump) {
-        p.vy = -JUMP_V * 0.9;
-        p.onGround = false;
-        p.aiJumpCd = 0.5;
-      }
+    const dy = (enemy.y + enemy.h*0.4) - (p.y + p.h*0.5);
+    const dist = Math.hypot(dx, dy);
+
+    // Horizontal movement decision
+    let wantDir = 0;
+    if (dist > tooFar) wantDir = Math.sign(dx);
+    else if (dist < tooClose) wantDir = -Math.sign(dx);
+    else wantDir = 0; // hold ground/strafe later
+
+    // Avoid hazards ahead
+    if (detectHazardsAhead(p)) {
+      // try opposite briefly
+      wantDir = -Math.sign(p.vx || dx || 1);
     }
-    
-    // Simple aiming - just point at enemy
+
+    // Apply acceleration with air control
+    const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.9;
+    p.vx += wantDir * accel * dt;
+    p.vx = clamp(p.vx, -MAX_VX * 0.75, MAX_VX * 0.75);
+
+    // Platform climbing and necessary jumps only
+    const needToClimb = enemy.y + enemy.h*0.4 < p.y - 20; // enemy above
+    const closeToEdge = platforms.some(s => s.y < p.y && s.y > p.y - 60 && p.x + p.w/2 > s.x - 10 && p.x + p.w/2 < s.x + s.w + 10);
+    const incomingBullet = detectIncomingBullets(p, enemy);
+
+    let shouldJump = false;
+    if (p.onGround && p.aiJumpCd === 0) {
+      if (detectHazardsAhead(p)) shouldJump = true;
+      else if (needToClimb && closeToEdge) shouldJump = true;
+      else if (incomingBullet && Math.random() < 0.5) shouldJump = true;
+    }
+
+    if (shouldJump) {
+      p.vy = -JUMP_V * (1 + p.jumpBoost*0.5);
+      p.onGround = false;
+      p.aiJumpCd = 0.5;
+    }
+
+    // Aiming with bullet drop compensation
     const gunX = p.x + p.w / 2 + p.facing * 12;
     const gunY = p.y + p.h * 0.35;
     const ex = enemy.x + enemy.w / 2;
     const ey = enemy.y + enemy.h * 0.4;
-    
-    let aimX = ex - gunX;
-    let aimY = ey - gunY;
-    
-    // Normalize
-    const n = Math.hypot(aimX, aimY) || 1;
-    aimX /= n;
-    aimY /= n;
-    
-    // Add some randomness
-    aimX += randRange(-0.1, 0.1);
-    aimY += randRange(-0.1, 0.1);
-    
-    const n2 = Math.hypot(aimX, aimY) || 1;
-    aimX /= n2;
-    aimY /= n2;
-    
+
+    const aim = computeAimWithDrop(gunX, gunY, ex, ey, p.bulletSpeed, G*0.2);
+    let aimX = aim.x, aimY = aim.y;
+
     // Update facing
-    p.facing = Math.sign(aimX) || 1;
-    
-    // Simple shooting - shoot when reloaded and enemy is visible
+    p.facing = Math.sign(aimX) || p.facing;
+
+    // Shooting logic
     p.reload -= dt;
     if (p.reload <= 0 && !p.reloading && p.ammoInMag > 0) {
-      // Shoot if enemy is roughly in front and not too far
-      if (Math.abs(dx) < 500 && Math.abs(dx) > 50) {
+      // only shoot if roughly in range and line-of-sight isn't badly blocked
+      if (Math.abs(dx) < 600 && !isEnemyBlocked(p, enemy)) {
         const vx = aimX * p.bulletSpeed;
         const vy = aimY * p.bulletSpeed;
         bullets.push(new Bullet(p, gunX, gunY, vx, vy, p.bulletDmg, p.color));
         p.ammoInMag--;
-        p.reload = p.fireDelay * (0.8 + AI.react * 0.4);
+        p.reload = p.fireDelay * (0.9 + AI.react * 0.3);
         addShake(0.05);
       }
     }
+  }
+
+  function computeAimWithDrop(gx, gy, tx, ty, speed, gdrop){
+    // brute-force over time to approximate a shot that matches speed considering gravity
+    let bestT = 0.3, bestErr = 1e9, best = {x:1,y:0};
+    for (let t = 0.2; t <= 1.2; t += 0.02) {
+      const vx = (tx - gx) / t;
+      const vy = (ty - gy + 0.5 * gdrop * t * t) / t;
+      const vm = Math.hypot(vx, vy);
+      const err = Math.abs(vm - speed);
+      if (err < bestErr) { bestErr = err; bestT = t; best = { x: vx / (vm || 1), y: vy / (vm || 1) }; }
+    }
+    return best;
   }
 
   // Helper function to detect incoming bullets
@@ -1672,6 +1731,9 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
     updatePlatforms(dt);
     updateEnvironment(dt);
 
+    // Online tick: send my state ~20Hz
+    if (isOnline && wsReady) { lastNetSend += dt; if (lastNetSend > 0.05) { lastNetSend = 0; const me = players[0]; netSend('state', { s: { x: me.x, y: me.y, vx: me.vx, vy: me.vy, hp: me.hp, facing: me.facing, ammoInMag: me.ammoInMag } }); } }
+
     for (let pi = 0; pi < players.length; pi++) {
       const p = players[pi];
       const isAI = !!p.controls.ai;
@@ -1839,6 +1901,7 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
       const vy = Math.sin(ang) * p.bulletSpeed;
       bullets.push(new Bullet(p, originX, originY, vx, vy, p.bulletDmg, p.color));
       spawnTrail(originX, originY, p.color);
+      if (isOnline && p === players[0]) { netSend('bullet', { b: { x: originX, y: originY, vx, vy } }); }
     }
     p.ammoInMag--;
     spawnMuzzle(originX, originY);

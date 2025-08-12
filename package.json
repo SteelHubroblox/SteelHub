@@ -1,0 +1,14 @@
+{
+  "name": "light-em-up-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Light 'em up! game server",
+  "main": "public/server.js",
+  "scripts": {
+    "start": "node public/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
