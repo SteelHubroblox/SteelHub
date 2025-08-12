@@ -87,3 +87,9 @@ canvas { display: block; }
 .tab-content.active { display: block; }
 
 .hidden { display: none !important; }
+
+/* Menu animations */
+@keyframes logoFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+.game-logo { animation: logoFloat 4s ease-in-out infinite; }
+.menu-options { opacity: 0; transform: translateY(12px); transition: opacity 280ms ease, transform 280ms ease; }
+.menu-options.show { opacity: 1; transform: translateY(0); }
