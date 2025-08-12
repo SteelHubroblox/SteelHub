@@ -2667,8 +2667,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let abilityCooldowns = {}; // id -> seconds remaining
     function ensureAbilityBar(){ if (document.getElementById('abilityBar')) return; const bar=document.createElement('div'); bar.id='abilityBar'; document.body.appendChild(bar); for (let i=0;i<10;i++){ const b=document.createElement('div'); b.className='ability-btn disabled'; b.innerHTML = '<span class="icon"></span><span class="key">'+ABILITY_LABELS[i]+'</span><div class="cooldown"></div>'; bar.appendChild(b);} }
     ensureAbilityBar();
-    function isActive(id){ return new Set(['dash','blink','phase','meteor']).has(id); }
-    function normalizeActiveDef(cardOrId){ const id = typeof cardOrId==='string'?cardOrId:cardOrId.id; const cdMap={ dash:3, blink:6, phase:10, meteor:12 }; return { id, cooldown: cdMap[id]||8, icon: (cardOrId&&cardOrId.icon)||'•' }; }
+    function isActive(id){ return new Set(['dash','blink','phase','meteor','timewarp']).has(id); }
+    function normalizeActiveDef(cardOrId){ const id = typeof cardOrId==='string'?cardOrId:cardOrId.id; const cdMap={ dash:3, blink:6, phase:10, meteor:12, timewarp:12 }; return { id, cooldown: cdMap[id]||8, icon: (cardOrId&&cardOrId.icon)||'•' }; }
     function getOwnedActives(player){ const unlocked = getDraftableCards(); const ownedIds = new Set(Object.keys(player.levels)); const out=[]; for (const c of unlocked){ if (isActive(c.id) && ownedIds.has(c.id)) out.push(normalizeActiveDef(c)); } return out.slice(0,10); }
     function setAbilityButtons(player){ const bar=document.getElementById('abilityBar'); if (!bar) return; const buttons=[...bar.children]; const actives=getOwnedActives(player); for (let i=0;i<buttons.length;i++){ const btn=buttons[i]; const icon=btn.querySelector('.icon'); const cdEl=btn.querySelector('.cooldown'); const ab=actives[i]; if (!ab){ btn.classList.add('disabled'); icon.textContent=''; cdEl.style.height='0%'; continue; } btn.classList.remove('disabled'); icon.textContent = ab.icon || '•'; const remain=Math.max(0, abilityCooldowns[ab.id]||0); const ratio = ab.cooldown? Math.min(1, remain/ab.cooldown):0; cdEl.style.height=(ratio*100)+'%'; } }
     function tickAbilityCooldowns(dt){ for (const k of Object.keys(abilityCooldowns)) abilityCooldowns[k]=Math.max(0,(abilityCooldowns[k]-dt)); }
@@ -2679,6 +2679,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (id==='blink'){ const dist=160; const nx=p.x + (p.facing||1)*dist; const test={ x:nx,y:p.y,w:p.w,h:p.h }; if (!collidesAABB(test)){ p.x = nx; return true; } return false; }
       if (id==='phase'){ p.invuln = Math.max(p.invuln||0, 1.5); return true; }
       if (id==='meteor'){ const tx = p.x + (p.facing||1)*220; const ty = p.y; spawnMeteor(tx, ty); return true; }
+      if (id==='timewarp'){ p.timewarp = Math.max(p.timewarp||0, 2.5); return true; }
       return false;
     }
     window.addEventListener('keydown',(e)=>{ const idx=ABILITY_KEYS.indexOf(e.code); if (idx===-1) return; const p=players[0]; const actives=getOwnedActives(p); const ab=actives[idx]; if (!ab) return; if ((abilityCooldowns[ab.id]||0)>0) return; if (activateAbility(p, ab.id)) abilityCooldowns[ab.id]=normalizeActiveDef(ab).cooldown; });
@@ -2690,8 +2691,10 @@ document.addEventListener('DOMContentLoaded', function() {
     update = function(dt){
       tickAbilityCooldowns(dt);
       // decrement invulnerability timers
-      for (const pl of players){ if (pl.invuln){ pl.invuln = Math.max(0, pl.invuln - dt); } }
-      __update(dt);
+      for (const pl of players){ if (pl.invuln){ pl.invuln = Math.max(0, pl.invuln - dt); } if (pl.timewarp){ pl.timewarp = Math.max(0, pl.timewarp - dt); } }
+      // Apply timewarp: slow simulation when local player has it active
+      const timeScale = (players[0].timewarp && players[0].timewarp>0) ? 0.6 : 1.0;
+      __update(dt * timeScale);
       setAbilityButtons(players[0]);
     };
     // Guard bullet/explosion damage paths (already inline checks exist for shields). Wrap by checking p.invuln before subtracting hp is handled in existing code blocks. We add a simple global flag used in checks below.
