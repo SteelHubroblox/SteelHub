@@ -37,3 +37,7 @@
 {"level":"error","event":0,"ip":"198.41.192.107","connIndex":0,"error":"context canceled","time":"2025-08-12T21:54:35Z","message":"Failed to serve tunnel connection"}
 {"level":"info","event":0,"ip":"198.41.192.107","connIndex":0,"time":"2025-08-12T21:54:35Z","message":"Retrying connection in up to 8s"}
 {"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:54:37Z","message":"Connection terminated"}
+{"level":"info","event":0,"ip":"198.41.192.107","connIndex":0,"time":"2025-08-12T21:55:43Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"error","event":0,"ip":"198.41.192.107","connIndex":0,"error":"context canceled","time":"2025-08-12T21:55:43Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.192.107","connIndex":0,"time":"2025-08-12T21:55:43Z","message":"Retrying connection in up to 16s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:55:51Z","message":"Connection terminated"}
