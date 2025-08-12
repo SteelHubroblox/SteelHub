@@ -2083,7 +2083,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {
           const hz = getHazardHit(p);
           if (hz){
-            const dps = hz.type==='saw' ? 120 : 40; // buff saw damage
+            const dps = 40; // unify saw and spike damage
             if (!(p.invuln && p.invuln>0)) p.hp -= dps * dt;
             spawnParticle(p.x + p.w/2, p.y + p.h, hz.type==='saw' ? '#cccccc' : currentPalette.spike);
           }
