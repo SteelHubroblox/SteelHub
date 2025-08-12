@@ -1081,6 +1081,14 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       return false;
     }
+    function getHazardHit(p){
+      const bbox = { x: p.x, y: p.y, w: p.w, h: p.h };
+      for (const hz of hazards){
+        if (hz.type==='spike'){ if (rectIntersectObj(bbox, hz)) return hz; }
+        else if (hz.type==='saw'){ const cx=p.x+p.w/2, cy=p.y+p.h/2; const dx=cx-hz.x, dy=cy-hz.y; if (dx*dx+dy*dy <= (hz.r+10)*(hz.r+10)) return hz; }
+      }
+      return null;
+    }
     function updateHazards(dt){
       for (const hz of hazards){ if (hz.type==='saw'){ hz.t += dt * (hz.speed||1); hz.x = hz.baseX + Math.sin(hz.t) * (hz.dx||0); hz.y = hz.baseY + Math.cos(hz.t) * (hz.dy||0); } }
     }
@@ -1320,6 +1328,9 @@ document.addEventListener('DOMContentLoaded', function() {
         platforms.push({ x: w*0.15, y: top2, w: 200, h: ph, active:true, shape:'wood' });
         platforms.push({ x: w*0.65, y: top2, w: 200, h: ph, active:true, shape:'wood' });
         platforms.push({ x: w*0.35, y: top3+30, w: 300, h: ph, active:true, shape:'rounded' });
+        // Lower small ledges
+        platforms.push({ x: w*0.08, y: groundY - 120, w: 140, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.78, y: groundY - 120, w: 140, h: ph, active:true, shape:'rounded' });
         addMovingSaw(w*0.5, top1+20, 18, 120, 0, 0.9);
         addSpikeRowSafe(0, groundY - 16, w*0.1, 16);
         addSpikeRowSafe(w*0.9, groundY - 16, w*0.1, 16);
@@ -1328,24 +1339,35 @@ document.addEventListener('DOMContentLoaded', function() {
         platforms.push({ x: w*0.1, y: top2+10, w: w*0.8, h: ph, active:true, shape:'grass' });
         addMovingPlat(w*0.2, top3+5, 180, ph, 0, 90, 1.0);
         addMovingPlat(w*0.7, top3+5, 180, ph, 0, -90, 1.0);
+        // Lower connectors
+        platforms.push({ x: w*0.18, y: groundY - 140, w: 180, h: ph, active:true, shape:'wood' });
+        platforms.push({ x: w*0.62, y: groundY - 140, w: 180, h: ph, active:true, shape:'wood' });
         addMovingSaw(w*0.5, top2-50, 16, 0, 80, 1.2);
       } else if (idx === 2) {
         // Reworked: opposing balconies and a lower bridge
         platforms.push({ x: w*0.15, y: top1, w: 220, h: ph, active:true, shape:'crystal' });
         platforms.push({ x: w*0.65, y: top1, w: 220, h: ph, active:true, shape:'crystal' });
         platforms.push({ x: w*0.35, y: top2+25, w: 300, h: ph, active:true, shape:'ice' });
+        // Low mid rung
+        platforms.push({ x: w*0.28, y: groundY - 150, w: 180, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.56, y: groundY - 150, w: 180, h: ph, active:true, shape:'rounded' });
         addMovingSaw(w*0.5, top3-10, 14, 120, 0, 1.1);
       } else if (idx === 3) {
         // Reworked: staggered steps and crumble mid
         platforms.push({ x: w*0.2, y: top3+10, w: 200, h: ph, active:true, shape:'rounded' });
         platforms.push({ x: w*0.55, y: top2, w: 240, h: ph, active:true, shape:'wood' });
         addCrumblePlat(w*0.35, top1+5, 260, ph, 0.6, 2.4);
+        // Low bridge
+        platforms.push({ x: w*0.3, y: groundY - 130, w: 260, h: ph, active:true, shape:'grass' });
         addMovingSaw(w*0.75, top1-20, 16, 0, 80, 1.0);
       } else if (idx === 4) {
         // Reworked: pyramid steps with central hazard path
         platforms.push({ x: w*0.1, y: top3, w: 160, h: ph, active:true, shape:'gold' });
         platforms.push({ x: w*0.3, y: top2, w: 220, h: ph, active:true, shape:'gold' });
         platforms.push({ x: w*0.55, y: top1, w: 260, h: ph, active:true, shape:'gold' });
+        // Lower stagger
+        platforms.push({ x: w*0.2, y: groundY - 140, w: 160, h: ph, active:true, shape:'wood' });
+        platforms.push({ x: w*0.6, y: groundY - 140, w: 160, h: ph, active:true, shape:'wood' });
         addMovingSaw(w*0.5, top2+10, 14, 100, 0, 1.2);
       } else if (idx === 5) {
         // Reworked: floating islands with a roaming saw
@@ -1354,6 +1376,9 @@ document.addEventListener('DOMContentLoaded', function() {
         platforms.push({ x: w*0.75, y: top3, w: 180, h: ph, active:true, shape:'rounded' });
         addMovingPlat(w*0.3, top3, 180, ph, 120, 0, 0.7);
         addCrumblePlat(w*0.65, top1, 180, ph, 0.5, 2.0);
+        // Lower safe perch
+        platforms.push({ x: w*0.12, y: groundY - 120, w: 160, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.72, y: groundY - 120, w: 160, h: ph, active:true, shape:'rounded' });
         addMovingSaw(w*0.35, top2, 16, 140, 0, 0.9);
       } else if (idx === 6) {
         // Twin towers with elevators
@@ -2054,7 +2079,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!prevOnGround && p.onGround) { spawnPuff(p.x + p.w/2, p.y + p.h, p.color); }
 
-        if (playerHitsHazard(p)) { p.hp -= 40*dt; spawnParticle(p.x + p.w/2, p.y + p.h, currentPalette.spike); }
+        // Hazard damage: saws deal higher DPS than spikes
+        {
+          const hz = getHazardHit(p);
+          if (hz){
+            const dps = hz.type==='saw' ? 120 : 40; // buff saw damage
+            if (!(p.invuln && p.invuln>0)) p.hp -= dps * dt;
+            spawnParticle(p.x + p.w/2, p.y + p.h, hz.type==='saw' ? '#cccccc' : currentPalette.spike);
+          }
+        }
 
         p.x = clamp(p.x, 0, canvas.width - p.w);
         if (p.onGround) p.vx -= p.vx * FRICTION * dt;
