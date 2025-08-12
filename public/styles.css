@@ -81,3 +81,7 @@ button.primary:hover, button.secondary:hover, .play-button:hover, .leaderboard-b
 
 canvas { display: block; }
 #game { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; }
+
+/* Leaderboard tab visibility */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
