@@ -843,6 +843,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.explosiveLevel = 0;
       this.lifesteal = 0;
       this.thorns = 0;
+      this.arcGravityScale = 1;
       this.shieldCooldownMax = 0; this.shieldCooldown = 0; this.shieldCharges = 0; this.shieldCapacity = 0;
       this.aiJumpCd = 0; this.aiOffsetX = 0;
       // mags/reload defaults
@@ -889,6 +890,8 @@ document.addEventListener('DOMContentLoaded', function() {
       const shieldL = clampLevel(L('shield')); if (shieldL) { this.shieldCooldownMax = 8 / (1 + 0.25 * (shieldL - 1)); this.shieldCapacity = Math.min(2, 1 + Math.floor((shieldL - 1) / 2)); }
       const lsL = clampLevel(L('lifesteal')); if (lsL) this.lifesteal = 6 * lsL;
       const hpL = clampLevel(L('hp')); if (hpL) this.maxHp += 40 * hpL;
+      // Arc Shot: increase bullet gravity scaling and slightly reduce speed for better lob
+      const arcL = clampLevel(L('arc')); if (arcL) { this.arcGravityScale = 1 + 0.35 * arcL; this.bulletSpeed *= (1 - 0.05 * arcL); }
 
       // Tradeoff and shooting abilities
       this.multishotLevel = clampLevel(L('multishot'));
@@ -1598,7 +1601,11 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         if (dist > tooFar) wantDir = Math.sign(dx);
         else if (dist < tooClose) wantDir = -Math.sign(dx);
-        else wantDir = 0; // hold ground/strafe later
+        else {
+          // strafe left/right mildly to avoid being stationary
+          p.strafeT = (p.strafeT||0) - dt; if (p.strafeT <= 0) { p.strafeT = 0.8 + Math.random()*0.8; p.strafeDir = (Math.random()<0.5?-1:1); }
+          wantDir = (p.strafeDir||1) * 0.6;
+        }
       }
 
       // Avoid hazards ahead
@@ -2091,16 +2098,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Drawing polish: player head
     function drawPlayer(p) {
+      const eq = (typeof _equipped==='function') ? _equipped() : {};
       // hp bar
       ctx.fillStyle = '#00000088'; drawRoundedRect(p.x - 2, p.y - 25, p.w + 4, 6, 3); ctx.fill();
       ctx.fillStyle = p.color; drawRoundedRect(p.x - 2, p.y - 25, (p.w + 4) * clamp(p.hp / (p.maxHp||100), 0, 1), 6, 3); ctx.fill();
       // shadow
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; drawRoundedRect(Math.floor(p.x)+2, Math.floor(p.y)+6, p.w, p.h, 12); ctx.fill();
       // body with black border
-      ctx.fillStyle = p.color; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.fill();
+      let bodyColor = p.color; if (eq.skin === 'skin_red') bodyColor = '#ff6b6b';
+      ctx.fillStyle = bodyColor; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.fill();
       ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; drawRoundedRect(Math.floor(p.x), Math.floor(p.y), p.w, p.h, 12); ctx.stroke();
       // head with black border
-      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.fill();
       ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y - 10, 10, 0, Math.PI*2); ctx.stroke();
       // eye
       ctx.fillStyle = '#0b1020'; ctx.beginPath(); ctx.arc(p.x + p.w/2 + (p.facing>0?4:-4), p.y - 12, 2, 0, Math.PI*2); ctx.fill();
@@ -2112,6 +2121,10 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!p.controls.ai) { aimX = mouseX - gx; aimY = mouseY - gy; } else { const enemy = players[0]; aimX = (enemy.x+enemy.w/2)-gx; aimY = (enemy.y+enemy.h*0.4)-gy; }
       const n = Math.hypot(aimX, aimY) || 1; aimX/=n; aimY/=n;
       drawGunAt(gx, gy, aimX, aimY, 22, 4);
+      // trail
+      if (eq.trail === 'trail_fire' && (Math.abs(p.vx) + Math.abs(p.vy) > 60)) { trails.push({ x: p.x + p.w/2, y: p.y + p.h, life: 0.25, color: 'rgba(255,120,40,0.8)' }); }
+      // hat
+      if (eq.hat === 'hat_crown') { ctx.fillStyle = '#ffd54f'; ctx.beginPath(); const cx=p.x+p.w/2, cy=p.y-22; const w=20,h=10; ctx.moveTo(cx - w/2, cy + h); ctx.lineTo(cx - w/4, cy); ctx.lineTo(cx, cy + h); ctx.lineTo(cx + w/4, cy); ctx.lineTo(cx + w/2, cy + h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='#000'; ctx.stroke(); }
     }
 
     function draw() {
