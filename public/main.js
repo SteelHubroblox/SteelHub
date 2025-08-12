@@ -1042,6 +1042,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Multiple arenas
     let currentArena = 0;
+    const ARENA_COUNT = 10;
     // Dynamic palettes per arena
     const PALETTES = [
       { bgTop: '#11243a', bgBot: '#1b3660', platTop: '#4a607a', platBot: '#32465e', accent: '#ffd166', spike: '#ff6b6b' },
