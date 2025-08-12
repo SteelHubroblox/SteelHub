@@ -1069,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Define spike helper before buildArena
     function addSpikeRow(x, y, w, h) { hazards.push({ x, y, w, h, type: 'spike' }); }
     function addMovingSaw(x, y, r, dx, dy, speed=1){ hazards.push({ type:'saw', x, y, r, baseX:x, baseY:y, dx, dy, t: Math.random()*Math.PI*2, speed }); }
+    function addBouncePad(x, y, w, h, power=1.3, dirX=0, dirY=-1){ hazards.push({ type:'bounce', x, y, w, h, power, dirX, dirY }); }
 
     function rectIntersectObj(p, o) { return p.x < o.x + o.w && p.x + p.w > o.x && p.y < o.y + o.h && p.y + p.h > o.y; }
     function playerHitsHazard(p) {
@@ -1089,6 +1090,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       return null;
     }
+    function getBouncePad(p){ const bbox = { x:p.x, y:p.y, w:p.w, h:p.h }; for (const hz of hazards){ if (hz.type==='bounce' && rectIntersectObj(bbox, hz)) return hz; } return null; }
     function updateHazards(dt){
       for (const hz of hazards){ if (hz.type==='saw'){ hz.t += dt * (hz.speed||1); hz.x = hz.baseX + Math.sin(hz.t) * (hz.dx||0); hz.y = hz.baseY + Math.cos(hz.t) * (hz.dy||0); } }
     }
@@ -1331,6 +1333,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Lower small ledges
         platforms.push({ x: w*0.08, y: groundY - 120, w: 140, h: ph, active:true, shape:'rounded' });
         platforms.push({ x: w*0.78, y: groundY - 120, w: 140, h: ph, active:true, shape:'rounded' });
+        // High air platform and bouncepads
+        platforms.push({ x: w*0.35, y: top1 - 60, w: 260, h: ph, active:true, shape:'crystal', crumble:true, delay:0.9, respawn:3, timer:-1, respawnTimer:0 });
+        addBouncePad(w*0.15, groundY - 24, 60, 16, 1.4, 0, -1);
+        addBouncePad(w*0.80, groundY - 24, 60, 16, 1.4, 0, -1);
         addMovingSaw(w*0.5, top1+20, 18, 120, 0, 0.9);
         addSpikeRowSafe(0, groundY - 16, w*0.1, 16);
         addSpikeRowSafe(w*0.9, groundY - 16, w*0.1, 16);
@@ -1342,6 +1348,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Lower connectors
         platforms.push({ x: w*0.18, y: groundY - 140, w: 180, h: ph, active:true, shape:'wood' });
         platforms.push({ x: w*0.62, y: groundY - 140, w: 180, h: ph, active:true, shape:'wood' });
+        // Air islands and bouncepads
+        platforms.push({ x: w*0.22, y: top1 - 40, w: 160, h: ph, active:true, shape:'rounded' });
+        platforms.push({ x: w*0.62, y: top1 - 40, w: 160, h: ph, active:true, shape:'rounded' });
+        addBouncePad(w*0.08, groundY - 28, 56, 16, 1.45, 0, -1);
+        addBouncePad(w*0.88, groundY - 28, 56, 16, 1.45, 0, -1);
         addMovingSaw(w*0.5, top2-50, 16, 0, 80, 1.2);
       } else if (idx === 2) {
         // Reworked: opposing balconies and a lower bridge
@@ -1351,6 +1362,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Low mid rung
         platforms.push({ x: w*0.28, y: groundY - 150, w: 180, h: ph, active:true, shape:'rounded' });
         platforms.push({ x: w*0.56, y: groundY - 150, w: 180, h: ph, active:true, shape:'rounded' });
+        // High perch with crumble and bouncepads to reach
+        platforms.push({ x: w*0.40, y: top1 - 70, w: 220, h: ph, active:true, shape:'wood', crumble:true, delay:1.0, respawn:3.2, timer:-1, respawnTimer:0 });
+        addBouncePad(w*0.30, groundY - 24, 50, 16, 1.35, 0, -1);
+        addBouncePad(w*0.70, groundY - 24, 50, 16, 1.35, 0, -1);
         addMovingSaw(w*0.5, top3-10, 14, 120, 0, 1.1);
       } else if (idx === 3) {
         // Reworked: staggered steps and crumble mid
@@ -1359,6 +1374,9 @@ document.addEventListener('DOMContentLoaded', function() {
         addCrumblePlat(w*0.35, top1+5, 260, ph, 0.6, 2.4);
         // Low bridge
         platforms.push({ x: w*0.3, y: groundY - 130, w: 260, h: ph, active:true, shape:'grass' });
+        // Air connector and bouncepad
+        platforms.push({ x: w*0.42, y: top1 - 50, w: 180, h: ph, active:true, shape:'gold' });
+        addBouncePad(w*0.06, groundY - 24, 54, 16, 1.4, 0, -1);
         addMovingSaw(w*0.75, top1-20, 16, 0, 80, 1.0);
       } else if (idx === 4) {
         // Reworked: pyramid steps with central hazard path
@@ -1368,6 +1386,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Lower stagger
         platforms.push({ x: w*0.2, y: groundY - 140, w: 160, h: ph, active:true, shape:'wood' });
         platforms.push({ x: w*0.6, y: groundY - 140, w: 160, h: ph, active:true, shape:'wood' });
+        // High thin bridge and bouncepads
+        platforms.push({ x: w*0.38, y: top1 - 60, w: 200, h: ph, active:true, shape:'ice', crumble:true, delay:0.8, respawn:2.8, timer:-1, respawnTimer:0 });
+        addBouncePad(w*0.12, groundY - 26, 52, 16, 1.45, 0, -1);
+        addBouncePad(w*0.82, groundY - 26, 52, 16, 1.45, 0, -1);
         addMovingSaw(w*0.5, top2+10, 14, 100, 0, 1.2);
       } else if (idx === 5) {
         // Reworked: floating islands with a roaming saw
@@ -1379,6 +1401,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Lower safe perch
         platforms.push({ x: w*0.12, y: groundY - 120, w: 160, h: ph, active:true, shape:'rounded' });
         platforms.push({ x: w*0.72, y: groundY - 120, w: 160, h: ph, active:true, shape:'rounded' });
+        // High connector and bouncepad
+        platforms.push({ x: w*0.46, y: top1 - 55, w: 180, h: ph, active:true, shape:'grass' });
+        addBouncePad(w*0.50, groundY - 24, 60, 16, 1.5, 0, -1);
         addMovingSaw(w*0.35, top2, 16, 140, 0, 0.9);
       } else if (idx === 6) {
         // Twin towers with elevators
@@ -2079,15 +2104,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!prevOnGround && p.onGround) { spawnPuff(p.x + p.w/2, p.y + p.h, p.color); }
 
-        // Hazard damage: saws deal higher DPS than spikes
+        // Hazard damage: spikes/saws only
         {
           const hz = getHazardHit(p);
-          if (hz){
-            const dps = 40; // unify saw and spike damage
+          if (hz && (hz.type==='spike' || hz.type==='saw')){
+            const dps = 40; // unified damage
             if (!(p.invuln && p.invuln>0)) p.hp -= dps * dt;
             spawnParticle(p.x + p.w/2, p.y + p.h, hz.type==='saw' ? '#cccccc' : currentPalette.spike);
           }
         }
+        // Bouncepads: propel the player
+        if (!p.bounceCd || p.bounceCd<=0){
+          const bp = getBouncePad(p);
+          if (bp){
+            const power = bp.power || 1.2; const dirX = bp.dirX||0, dirY = bp.dirY||-1;
+            const base = 560 * power;
+            p.vx += dirX * base * 0.25;
+            p.vy = Math.min(p.vy, dirY * base); // strong upward impulse
+            p.onGround = false; p.jumpsUsed = 0;
+            p.bounceCd = 0.2; // brief cooldown so we don't re-trigger every frame
+            spawnRing(p.x + p.w/2, p.y + p.h*0.9, '#94f9ff', 0.2, 14);
+          }
+        } else { p.bounceCd -= dt; }
 
         p.x = clamp(p.x, 0, canvas.width - p.w);
         if (p.onGround) p.vx -= p.vx * FRICTION * dt;
@@ -2630,6 +2668,24 @@ document.addEventListener('DOMContentLoaded', function() {
           ctx.translate(hz.x, hz.y);
           ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(0,0,hz.r,0,Math.PI*2); ctx.fill();
           ctx.strokeStyle = '#666'; ctx.lineWidth = 2; for (let k=0;k<8;k++){ const a = (k/8)*Math.PI*2 + hz.t*4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*hz.r, Math.sin(a)*hz.r); ctx.stroke(); }
+          ctx.restore();
+        } else if (hz.type === 'bounce') {
+          // Draw a springy pad with chevrons
+          ctx.save();
+          ctx.fillStyle = '#20c997';
+          ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
+          // chevrons indicating direction
+          ctx.fillStyle = '#0b7285';
+          for (let i=0;i<3;i++){
+            const cx = hz.x + hz.w*0.2 + i*hz.w*0.25;
+            const cy = hz.y + hz.h*0.2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + hz.h*0.6);
+            ctx.lineTo(cx + hz.w*0.15, cy + hz.h*0.3);
+            ctx.lineTo(cx + hz.w*0.3, cy + hz.h*0.6);
+            ctx.closePath();
+            ctx.fill();
+          }
           ctx.restore();
         }
       }
