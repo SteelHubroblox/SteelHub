@@ -1319,11 +1319,11 @@ const ALL_CARDS = [
   }
 
   // AI params
-  const AI = { react: 0.2, aimJitter: 0.15 };
+  const AI = { react: 0.2, aimJitter: 0.15, jumpCooldown: 0.7, dodgeProb: 0.5 };
   function setDifficulty(label) {
-    if (label === 'easy') { AI.react = 0.35; AI.aimJitter = 0.3; }
-    else if (label === 'hard') { AI.react = 0.12; AI.aimJitter = 0.06; }
-    else { AI.react = 0.2; AI.aimJitter = 0.15; }
+    if (label === 'easy') { AI.react = 0.35; AI.aimJitter = 0.35; AI.jumpCooldown = 0.95; AI.dodgeProb = 0.35; }
+    else if (label === 'hard') { AI.react = 0.12; AI.aimJitter = 0.06; AI.jumpCooldown = 0.55; AI.dodgeProb = 0.7; }
+    else { AI.react = 0.2; AI.aimJitter = 0.18; AI.jumpCooldown = 0.75; AI.dodgeProb = 0.5; }
   }
   setDifficulty('normal');
   difficultySel?.addEventListener('change', (e) => setDifficulty(e.target.value));
@@ -1446,6 +1446,42 @@ const ALL_CARDS = [
   }
 
   // AI improvements
+  function rotateVec(x, y, ang){ const c=Math.cos(ang), s=Math.sin(ang); return { x: x*c - y*s, y: x*s + y*c }; }
+  function headBlocked(p){
+    const box = { x: p.x + 4, y: p.y - 16, w: p.w - 8, h: 14 };
+    for (const s of platforms) { if (s.active === false) continue; if (rectsIntersect(box, s)) return true; }
+    return false;
+  }
+  function findClimbTarget(p){
+    // Find a platform above within horizontal reach after a jump
+    const maxRise = (JUMP_V * JUMP_V) / (2 * G); // theoretical max rise
+    const targetY = p.y - Math.min(maxRise, 180);
+    let best = null; let bestDy = 1e9;
+    for (const s of platforms){
+      if (s.type === 'ground' || s.active === false) continue;
+      if (s.y + 2 >= p.y) continue; // only above
+      const dy = (p.y - s.y);
+      if (dy > maxRise + 40) continue;
+      const sLeft = s.x - 12, sRight = s.x + s.w + 12;
+      const cx = p.x + p.w/2;
+      // Require we are roughly under the platform horizontally, or will be after short move
+      if (cx > sLeft - 80 && cx < sRight + 80) {
+        if (dy < bestDy) { bestDy = dy; best = s; }
+      }
+    }
+    return best;
+  }
+  function shouldJumpToReach(p){
+    const target = findClimbTarget(p);
+    if (!target) return false;
+    // Simple check: head not blocked and close enough horizontally to land on top area
+    const cx = p.x + p.w/2;
+    const targetLeft = target.x - 6, targetRight = target.x + target.w + 6;
+    if (cx < targetLeft - 24) return false;
+    if (cx > targetRight + 24) return false;
+    if (headBlocked(p)) return false;
+    return true;
+  }
   function updateAI(p, dt) {
     const enemy = players[0];
     p.aiJumpCd = Math.max(0, p.aiJumpCd - dt);
@@ -1477,21 +1513,20 @@ const ALL_CARDS = [
     p.vx = clamp(p.vx, -MAX_VX * 0.75, MAX_VX * 0.75);
 
     // Platform climbing and necessary jumps only
-    const needToClimb = enemy.y + enemy.h*0.4 < p.y - 20; // enemy above
-    const closeToEdge = platforms.some(s => s.y < p.y && s.y > p.y - 60 && p.x + p.w/2 > s.x - 10 && p.x + p.w/2 < s.x + s.w + 10);
+    const needToClimb = enemy.y + enemy.h*0.4 < p.y - 24; // enemy above
     const incomingBullet = detectIncomingBullets(p, enemy);
 
     let shouldJump = false;
     if (p.onGround && p.aiJumpCd === 0) {
       if (detectHazardsAhead(p)) shouldJump = true;
-      else if (needToClimb && closeToEdge) shouldJump = true;
-      else if (incomingBullet && Math.random() < 0.5) shouldJump = true;
+      else if (needToClimb && shouldJumpToReach(p)) shouldJump = true;
+      else if (incomingBullet && Math.random() < AI.dodgeProb) shouldJump = true;
     }
 
     if (shouldJump) {
       p.vy = -JUMP_V * (1 + p.jumpBoost*0.5);
       p.onGround = false;
-      p.aiJumpCd = 0.5;
+      p.aiJumpCd = AI.jumpCooldown;
     }
 
     // Aiming with bullet drop compensation
@@ -1500,8 +1535,12 @@ const ALL_CARDS = [
     const ex = enemy.x + enemy.w / 2;
     const ey = enemy.y + enemy.h * 0.4;
 
-    const aim = computeAimWithDrop(gunX, gunY, ex, ey, p.bulletSpeed, G*0.2);
+    const aim = computeAimWithDropLead(gunX, gunY, ex, ey, enemy.vx || 0, enemy.vy || 0, p.bulletSpeed, G*0.2);
     let aimX = aim.x, aimY = aim.y;
+    // jitter scaled by difficulty
+    const jitterAng = randRange(-AI.aimJitter, AI.aimJitter) * 0.08; // ~±0.08 rad at aimJitter=1
+    const jittered = rotateVec(aimX, aimY, jitterAng);
+    aimX = jittered.x; aimY = jittered.y;
 
     // Update facing
     p.facing = Math.sign(aimX) || p.facing;
@@ -1521,15 +1560,17 @@ const ALL_CARDS = [
     }
   }
 
-  function computeAimWithDrop(gx, gy, tx, ty, speed, gdrop){
-    // brute-force over time to approximate a shot that matches speed considering gravity
-    let bestT = 0.3, bestErr = 1e9, best = {x:1,y:0};
-    for (let t = 0.2; t <= 1.2; t += 0.02) {
-      const vx = (tx - gx) / t;
-      const vy = (ty - gy + 0.5 * gdrop * t * t) / t;
-      const vm = Math.hypot(vx, vy);
+  function computeAimWithDropLead(gx, gy, tx, ty, tvx, tvy, speed, gdrop){
+    // brute-force time to impact including target lead and bullet drop
+    let bestErr = 1e9, best = { x: 1, y: 0 };
+    for (let t = 0.15; t <= 1.4; t += 0.02) {
+      const px = tx + tvx * t;
+      const py = ty + tvy * t;
+      const vx = (px - gx) / t;
+      const vy = (py - gy + 0.5 * gdrop * t * t) / t;
+      const vm = Math.hypot(vx, vy) || 1;
       const err = Math.abs(vm - speed);
-      if (err < bestErr) { bestErr = err; bestT = t; best = { x: vx / (vm || 1), y: vy / (vm || 1) }; }
+      if (err < bestErr) { bestErr = err; best = { x: vx / vm, y: vy / vm }; }
     }
     return best;
   }
@@ -1894,14 +1935,27 @@ window.addEventListener('mousedown', (e) => { if (!isMobile) return; if (isRight
     const originX = p.x + p.w / 2 + p.facing * 12;
     const originY = p.y + p.h * 0.35;
     const pellets = 1 + (p.pellets || 0);
-    for (let k = 0; k < pellets; k++) {
-      const spread = (p.pellets ? randRange(-0.12, 0.12) : 0); // radians approx ±7°
-      const ang = Math.atan2(dirY, dirX) + spread;
+    if (pellets === 1) {
+      const ang = Math.atan2(dirY, dirX);
       const vx = Math.cos(ang) * p.bulletSpeed;
       const vy = Math.sin(ang) * p.bulletSpeed;
       bullets.push(new Bullet(p, originX, originY, vx, vy, p.bulletDmg, p.color));
       spawnTrail(originX, originY, p.color);
       if (isOnline && p === players[0]) { netSend('bullet', { b: { x: originX, y: originY, vx, vy } }); }
+    } else {
+      // widen spread with more pellets; distribute evenly with slight jitter
+      const base = Math.atan2(dirY, dirX);
+      const maxSpread = 0.10 + 0.06 * (pellets - 1); // radians
+      for (let k = 0; k < pellets; k++) {
+        const t = pellets === 1 ? 0 : (k / (pellets - 1)) * 2 - 1; // -1..1
+        const jitter = randRange(-1, 1) * (maxSpread * 0.08);
+        const ang = base + t * maxSpread + jitter;
+        const vx = Math.cos(ang) * p.bulletSpeed;
+        const vy = Math.sin(ang) * p.bulletSpeed;
+        bullets.push(new Bullet(p, originX, originY, vx, vy, p.bulletDmg, p.color));
+        spawnTrail(originX, originY, p.color);
+        if (isOnline && p === players[0]) { netSend('bullet', { b: { x: originX, y: originY, vx, vy } }); }
+      }
     }
     p.ammoInMag--;
     spawnMuzzle(originX, originY);
