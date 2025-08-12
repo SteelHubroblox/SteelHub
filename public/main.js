@@ -844,6 +844,13 @@ document.addEventListener('DOMContentLoaded', function() {
       this.lifesteal = 0;
       this.thorns = 0;
       this.arcGravityScale = 1;
+      // Status effects and new ability flags
+      this.slowTimer = 0;
+      this.slowFactor = 1;
+      this.homingLevel = 0;
+      this.slowLevel = 0;
+      this.walljumpLevel = 0;
+      this.splashLevel = 0;
       this.shieldCooldownMax = 0; this.shieldCooldown = 0; this.shieldCharges = 0; this.shieldCapacity = 0;
       this.aiJumpCd = 0; this.aiOffsetX = 0;
       // mags/reload defaults
@@ -895,6 +902,10 @@ document.addEventListener('DOMContentLoaded', function() {
       const arcL = clampLevel(L('arc')); if (arcL) { this.arcGravityScale = 1 + 0.35 * arcL; this.bulletSpeed *= (1 - 0.05 * arcL); }
 
       // Tradeoff and shooting abilities
+      const slowL = clampLevel(L('slow')); this.slowLevel = slowL;
+      const homingL = clampLevel(L('homing')); this.homingLevel = homingL;
+      const wjL = clampLevel(L('walljump')); this.walljumpLevel = wjL;
+      const splashL = clampLevel(L('splash')); this.splashLevel = splashL;
       this.multishotLevel = clampLevel(L('multishot'));
       this.burstLevel = clampLevel(L('burst'));
       const bigMagL = clampLevel(L('bigmag'));
@@ -1942,14 +1953,37 @@ document.addEventListener('DOMContentLoaded', function() {
           const moveRight = keys.has('KeyD') || mobileMoveRight;
           if (moveLeft) p.vx -= accel * dt;
           if (moveRight) p.vx += accel * dt;
-          p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost), MAX_VX * (1 + p.moveBoost));
+          // Apply movement speed clamp with slow debuff factor
+          p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost) * (p.slowFactor || 1), MAX_VX * (1 + p.moveBoost) * (p.slowFactor || 1));
 
-          if (jumpPressed && (p.onGround || p.jumpsUsed < p.maxJumps)) {
+          // Jump and Wall Jump
+          const canNormalJump = (p.onGround || p.jumpsUsed < p.maxJumps);
+          let didJump = false;
+          if (jumpPressed && canNormalJump) {
             if (p.onGround) p.jumpsUsed = 0;
             p.vy = -JUMP_V * (1 + p.jumpBoost);
             p.onGround = false;
             p.jumpsUsed++;
             spawnPuff(p.x + p.w/2, p.y + p.h, p.color);
+            didJump = true;
+          } else if (jumpPressed && !p.onGround && p.walljumpLevel > 0) {
+            // Simple wall contact test: check immediate left/right for solid
+            const leftBox = { x: p.x - 2, y: p.y, w: 2, h: p.h };
+            const rightBox = { x: p.x + p.w, y: p.y, w: 2, h: p.h };
+            let touchLeft = false, touchRight = false;
+            for (const s of platforms) {
+              if (!s.active) continue;
+              if (rectsIntersect(leftBox, s)) touchLeft = true;
+              if (rectsIntersect(rightBox, s)) touchRight = true;
+            }
+            if (touchLeft || touchRight) {
+              const dir = touchLeft ? 1 : -1; // push away from wall
+              p.vx = dir * 260;
+              p.vy = -JUMP_V * (0.9 + 0.05 * p.walljumpLevel);
+              p.onGround = false;
+              spawnRing(p.x + p.w/2, p.y + p.h*0.9, '#9ad7ff', 0.2, 12);
+              didJump = true;
+            }
           }
 
           if (keys.has('KeyR') && !p.reloading && p.ammoInMag < p.magSize) { p.reloading = true; p.reloadTimer = p.reloadTime; }
@@ -2024,11 +2058,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
         p.x = clamp(p.x, 0, canvas.width - p.w);
         if (p.onGround) p.vx -= p.vx * FRICTION * dt;
+
+        // Tick slows
+        if (p.slowTimer && p.slowTimer > 0) { p.slowTimer -= dt; if (p.slowTimer <= 0) { p.slowTimer = 0; p.slowFactor = 1; } }
       }
 
       // Bullets update remains as earlier...
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
+        // Homing adjustment towards nearest enemy if owner has homing
+        if (b.owner && b.owner.homingLevel > 0) {
+          let target = null; for (const p of players) { if (p !== b.owner) { target = p; break; } }
+          if (target) {
+            const tx = target.x + target.w/2, ty = target.y + target.h*0.4;
+            const dx = tx - b.x, dy = ty - b.y; const dist = Math.hypot(dx, dy) || 1;
+            const speed = Math.hypot(b.vx, b.vy) || 1;
+            const steer = 2.5 + 1.0 * b.owner.homingLevel; // blend per second
+            const wantX = (dx / dist) * speed, wantY = (dy / dist) * speed;
+            const alpha = Math.min(1, steer * dt);
+            b.vx = b.vx + (wantX - b.vx) * alpha;
+            b.vy = b.vy + (wantY - b.vy) * alpha;
+          }
+        }
         b.life -= dt; if (b.life <= 0) { bullets.splice(i, 1); continue; }
         b.x += b.vx * dt; b.y += b.vy * dt;
         b.vy += (G * 0.2) * dt;
@@ -2047,6 +2098,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!(p.invuln && p.invuln>0)) p.hp -= b.dmg;
             if (p.thorns && p.thorns>0 && b.owner && b.owner!==p) { if (!(b.owner.invuln&&b.owner.invuln>0)) { b.owner.hp -= Math.max(1, Math.round(b.dmg * p.thorns)); spawnRing(b.owner.x + b.owner.w/2, b.owner.y + b.owner.h*0.4, '#ff6b6b', 0.2, 12); } }
             if (b.owner.lifesteal) b.owner.hp = clamp((b.owner.hp||100) + b.owner.lifesteal, 0, b.owner.maxHp||100);
+            // Cryo Rounds: apply slow on hit
+            if (b.owner.slowLevel && b.owner.slowLevel > 0) {
+              const dur = 0.8 + 0.4 * b.owner.slowLevel;
+              p.slowTimer = Math.max(p.slowTimer || 0, dur);
+              p.slowFactor = Math.min(p.slowFactor || 1, 1 - 0.15 * b.owner.slowLevel);
+              spawnRing(p.x + p.w/2, p.y + p.h*0.4, '#74c0fc', 0.25, 12);
+            }
+            // Splash Damage: small AoE around impact
+            if (b.owner.splashLevel && b.owner.splashLevel > 0) {
+              const rad = 36 + 10 * b.owner.splashLevel;
+              for (const q of players) {
+                if (q === b.owner) continue;
+                const qx = q.x + q.w/2, qy = q.y + q.h/2; const d = Math.hypot(qx - b.x, qy - b.y);
+                if (d <= rad) { if (!(q.invuln && q.invuln>0)) q.hp -= 6 * b.owner.splashLevel; }
+              }
+              spawnRing(b.x, b.y, '#8ecae6', 0.2, Math.max(10, rad*0.5));
+            }
             p.vx += Math.sign(b.vx) * 80; p.vy -= 120;
             // Sleek impact VFX
             spawnImpact(b.x, b.y, b.color, b.dmg);
