@@ -817,6 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.controls = controls;
       this.w = 40; this.h = 56;
       this.levels = {}; // id -> level (1..4)
+      this.support = null; // platform currently supporting the player
       this.reset();
     }
     reset(spawnX, spawnY) {
@@ -824,6 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.y = spawnY ?? (canvas.height - 60 - this.h);
       this.vx = 0; this.vy = 0;
       this.onGround = false;
+      this.support = null;
       this.maxHp = this.maxHp || 100;
       this.hp = this.maxHp;
       this.reload = 0;
@@ -1582,11 +1584,17 @@ document.addEventListener('DOMContentLoaded', function() {
       const dy = (enemy.y + enemy.h*0.4) - (p.y + p.h*0.5);
       const dist = Math.hypot(dx, dy);
 
-      // Horizontal movement decision
+      // Decide movement target: enemy or a climb platform
+      const climbTarget = isEnemyBlocked(p, enemy) || (enemy.y + enemy.h*0.4 < p.y - 24) ? findClimbTarget(p) : null;
       let wantDir = 0;
-      if (dist > tooFar) wantDir = Math.sign(dx);
-      else if (dist < tooClose) wantDir = -Math.sign(dx);
-      else wantDir = 0; // hold ground/strafe later
+      if (climbTarget) {
+        const tx = climbTarget.x + climbTarget.w/2;
+        wantDir = Math.sign(tx - (p.x + p.w/2));
+      } else {
+        if (dist > tooFar) wantDir = Math.sign(dx);
+        else if (dist < tooClose) wantDir = -Math.sign(dx);
+        else wantDir = 0; // hold ground/strafe later
+      }
 
       // Avoid hazards ahead
       if (detectHazardsAhead(p)) {
@@ -1606,7 +1614,7 @@ document.addEventListener('DOMContentLoaded', function() {
       let shouldJump = false;
       if (p.onGround && p.aiJumpCd === 0) {
         if (detectHazardsAhead(p)) shouldJump = true;
-        else if (needToClimb && shouldJumpToReach(p)) shouldJump = true;
+        else if ((needToClimb || climbTarget) && shouldJumpToReach(p)) shouldJump = true;
         else if (incomingBullet && Math.random() < AI.dodgeProb) shouldJump = true;
       }
 
@@ -1817,6 +1825,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updatePlatforms(dt) {
       for (const s of platforms) {
+        // store previous position for carry calculations
+        s.prevX = s.prevX ?? s.x;
+        s.prevY = s.prevY ?? s.y;
         if (s.move) {
           s.t += dt * (s.speed || 1);
           s.x = s.baseX + Math.sin(s.t) * (s.dx || 0);
@@ -1827,6 +1838,9 @@ document.addEventListener('DOMContentLoaded', function() {
             s.respawnTimer -= dt; if (s.respawnTimer <= 0) { s.active = true; s.timer = -1; }
           }
         }
+        s.carryDx = (s.x - s.prevX) || 0;
+        s.carryDy = (s.y - s.prevY) || 0;
+        s.prevX = s.x; s.prevY = s.y;
       }
     }
 
@@ -1868,6 +1882,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Reload handling
         if (p.reloading) { p.reloadTimer -= dt; if (p.reloadTimer <= 0) { p.reloading = false; p.ammoInMag = p.magSize; } }
+
+        // Apply platform carry if standing on a moving platform from last frame
+        if (p.onGround && p.support && p.support.active) {
+          p.x += p.support.carryDx || 0;
+          p.y += p.support.carryDy || 0;
+        }
 
         if (!isAI && !p.controls.online) {
           const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL);
@@ -1940,7 +1960,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (s.active === false) continue;
           if (rectsIntersect(bboxY, s)) {
             if (p.vy > 0) {
-              p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0;
+              p.y = s.y - p.h; p.onGround = true; p.jumpsUsed = 0; p.support = s;
               if (s.crumble && s.timer < 0) { s.timer = s.delay; }
             } else if (p.vy < 0) {
               p.y = s.y + s.h;
