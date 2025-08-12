@@ -306,9 +306,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Pause button event listeners
   const pauseButton = document.getElementById('pauseButton');
-  const pauseOverlay = document.getElementById('pauseOverlay');
-  const btnResume = document.getElementById('btnResume');
-  const btnQuit = document.getElementById('btnQuit');
 
   pauseButton.addEventListener('click', () => {
     setPaused(!paused);
