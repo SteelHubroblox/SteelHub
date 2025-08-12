@@ -923,14 +923,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Leveled abilities (up to 4)
   const MAX_LEVEL = 4;
 
-  const RARITY = { Common: 'Common', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary' };
+  const RARITY = { Common: 'Common', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary', Secret: 'Secret' };
   const RARITY_WEIGHTS = [
-    { r: RARITY.Common, w: 0.6 },
-    { r: RARITY.Rare, w: 0.28 },
-    { r: RARITY.Epic, w: 0.1 },
-    { r: RARITY.Legendary, w: 0.02 },
+    { r: RARITY.Common, w: 0.60 },
+    { r: RARITY.Rare, w: 0.20 },
+    { r: RARITY.Epic, w: 0.10 },
+    { r: RARITY.Legendary, w: 0.07 },
+    { r: RARITY.Secret, w: 0.03 },
   ];
-  const RARITY_COLOR = { Common: '#9aa6b2', Rare: '#53b3f3', Epic: '#c77dff', Legendary: '#ffd166' };
+  const RARITY_COLOR = { Common: '#9aa6b2', Rare: '#53b3f3', Epic: '#c77dff', Legendary: '#ffd166', Secret: '#ff6bd6' };
 
     function weightedRarity() {
       const x = Math.random();
@@ -969,10 +970,12 @@ document.addEventListener('DOMContentLoaded', function() {
       { id: 'homing', title: 'Homing Bullets', desc: 'Bullets slightly home in on foes', rarity: RARITY.Epic, icon: '🧲' },
       { id: 'blink', title: 'Blink', desc: 'Short-range teleport with cooldown', rarity: RARITY.Legendary, icon: '🌀' },
       { id: 'thorns', title: 'Thorns', desc: 'Return a portion of damage to attacker', rarity: RARITY.Rare, icon: '🌵' },
-      { id: 'phase', title: 'Phase Shift', desc: 'Brief invulnerability window', rarity: RARITY.Secret || 'Legendary', icon: '🛡️' },
+      { id: 'phase', title: 'Phase Shift', desc: 'Brief invulnerability window', rarity: RARITY.Secret, icon: '🛡️' },
       { id: 'arc', title: 'Arc Shot', desc: 'Bullets arc more with gravity', rarity: RARITY.Common, icon: '〽️' },
       { id: 'splash', title: 'Splash Damage', desc: 'Small AoE on bullet impact', rarity: RARITY.Rare, icon: '💥' },
       { id: 'slow', title: 'Cryo Rounds', desc: 'Hits slow enemy movement briefly', rarity: RARITY.Epic, icon: '❄️' },
+      { id: 'timewarp', title: 'Time Warp', desc: 'Briefly slow time around you', rarity: RARITY.Legendary, icon: '🕒' },
+      { id: 'meteor', title: 'Meteor Strike', desc: 'Call a small meteor at target point', rarity: RARITY.Secret, icon: '☄️' },
     ];
     function getDraftableCards(){
       const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities') || '[]'));
@@ -2603,7 +2606,13 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.innerHTML = '<div class="menu-card" style="max-width:720px;"><div class="menu-title accent-title">Shop</div><div>Coins: <span id="coinsLabel"></span></div><div class="menu-row"><button id="watchAd" class="secondary">Watch Ad (+25)</button></div><div class="menu-sub" style="margin-top:10px;">Cosmetics</div><div id="cosmetics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div class="menu-sub">Ability Packs</div><div id="packs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0;"></div><div style="display:flex;justify-content:flex-end"><button id="closeShop" class="primary">Close</button></div></div>';
         document.body.appendChild(overlay);
         overlay.querySelector('#closeShop').onclick = () => overlay.remove();
-        overlay.querySelector('#watchAd').onclick = () => { addCoins(25); openShop(); };
+        overlay.querySelector('#watchAd').onclick = () => { 
+          const now = Date.now();
+          const last = parseInt(localStorage.getItem('lastAdTs')||'0',10);
+          const cooldownMs = 15*60*1000;
+          if (now - last < cooldownMs) return; 
+          addCoins(25); localStorage.setItem('lastAdTs', String(now)); openShop();
+        };
       }
       document.getElementById('coinsLabel').textContent = String(coins);
       const cosmetics = [{id:'skin_red',name:'Red Skin'},{id:'hat_crown',name:'Crown'},{id:'trail_fire',name:'Fire Trail'}];
@@ -2611,7 +2620,13 @@ document.addEventListener('DOMContentLoaded', function() {
       const owned = new Set(JSON.parse(localStorage.getItem('unlockedCosmetics')||'[]'));
       for (const c of cosmetics){ const el=document.createElement('div'); el.className='card'; const o=owned.has(c.id); el.innerHTML=`<div class="card-title">${c.name}</div><div class="card-desc">150 coins</div><button class="primary" ${o?'disabled':''}>${o?'Owned':'Buy'}</button>`; el.querySelector('button').onclick=()=>{ if(o||coins<150)return; owned.add(c.id); localStorage.setItem('unlockedCosmetics',JSON.stringify([...owned])); addCoins(-150); openShop(); }; grid.appendChild(el);} 
       const packs = document.getElementById('packs'); packs.innerHTML='';
-      const rarities = [{r:RARITY.Common,p:200},{r:RARITY.Rare,p:350},{r:RARITY.Epic,p:500},{r:RARITY.Legendary,p:700}];
+      const rarities = [
+        {r:RARITY.Common,p:100},
+        {r:RARITY.Rare,p:200},
+        {r:RARITY.Epic,p:350},
+        {r:RARITY.Legendary,p:500},
+        {r:RARITY.Secret,p:800}
+      ];
       const unlocked = new Set(JSON.parse(localStorage.getItem('unlockedAbilities')||'[]'));
       for (const it of rarities){ const el=document.createElement('div'); el.className='card'; el.innerHTML=`<div class="card-title" style="color:${RARITY_COLOR[it.r]}">${it.r} Ability</div><div class="card-desc">${it.p} coins</div><button class="primary">Buy</button>`; el.querySelector('button').onclick=()=>{ if(coins<it.p)return; const pool=NEW_ABILITIES.filter(a=>a.rarity===it.r && !unlocked.has(a.id)); if(!pool.length)return; const pick=pool[Math.floor(Math.random()*pool.length)]; unlocked.add(pick.id); localStorage.setItem('unlockedAbilities',JSON.stringify([...unlocked])); addCoins(-it.p); openShop(); }; packs.appendChild(el);} 
     }
