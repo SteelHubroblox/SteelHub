@@ -76,3 +76,7 @@ nohup: ignoring input
 {"level":"error","event":0,"ip":"198.41.200.193","connIndex":0,"error":"context canceled","time":"2025-08-12T21:55:52Z","message":"Failed to serve tunnel connection"}
 {"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-12T21:55:52Z","message":"Retrying connection in up to 32s"}
 {"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-12T21:56:23Z","message":"Connection terminated"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-13T12:32:04Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"error","event":0,"ip":"198.41.200.193","connIndex":0,"error":"context canceled","time":"2025-08-13T12:32:04Z","message":"Failed to serve tunnel connection"}
+{"level":"info","event":0,"ip":"198.41.200.193","connIndex":0,"time":"2025-08-13T12:32:04Z","message":"Retrying connection in up to 1m4s"}
+{"level":"error","error":"context canceled","connIndex":0,"time":"2025-08-13T12:32:14Z","message":"Connection terminated"}

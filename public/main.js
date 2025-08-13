@@ -1070,6 +1070,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function addSpikeRow(x, y, w, h) { hazards.push({ x, y, w, h, type: 'spike' }); }
     function addMovingSaw(x, y, r, dx, dy, speed=1){ hazards.push({ type:'saw', x, y, r, baseX:x, baseY:y, dx, dy, t: Math.random()*Math.PI*2, speed }); }
     function addBouncePad(x, y, w, h, power=1.7, dirX=0, dirY=-1){ hazards.push({ type:'bounce', x, y, w, h, power, dirX, dirY }); }
+    function addBouncePadSafe(x, y, w, h, power=1.7, dirX=0, dirY=-1){
+      // Move pad horizontally if it intersects spawn-safe zones
+      let rx = x;
+      const padRect = () => ({ x: rx, y, w, h });
+      const overlapsSpawn = () => spawnNoSpikeRects && spawnNoSpikeRects.some(z => rectsIntersect(padRect(), z));
+      // Try left of any overlapping spawn zone
+      let attempts = 0;
+      while (overlapsSpawn() && attempts < 4){
+        for (const z of spawnNoSpikeRects){ if (rectsIntersect(padRect(), z)) { rx = z.x - w - 12; } }
+        rx = clamp(rx, 8, canvas.width - w - 8);
+        attempts++;
+      }
+      // If still overlapping, push to the right side of last spawn rect
+      attempts = 0;
+      while (overlapsSpawn() && attempts < 4){
+        for (const z of spawnNoSpikeRects){ if (rectsIntersect(padRect(), z)) { rx = z.x + z.w + 12; } }
+        rx = clamp(rx, 8, canvas.width - w - 8);
+        attempts++;
+      }
+      addBouncePad(rx, y, w, h, power, dirX, dirY);
+    }
 
     function rectIntersectObj(p, o) { return p.x < o.x + o.w && p.x + p.w > o.x && p.y < o.y + o.h && p.y + p.h > o.y; }
     function playerHitsHazard(p) {
@@ -1453,14 +1474,23 @@ document.addEventListener('DOMContentLoaded', function() {
         function safeRect(r){ return r.x>=8 && r.x+r.w<=w-8 && r.y>=40 && r.y+r.h<=groundY-8; }
         function inSpawnSafe(r){ for (const z of spawnNoSpikeRects){ if (rectsIntersect(r, z)) return true; } return false; }
         // 1) Add a couple of high-air platforms across the map
-        const extraCount = 2 + Math.floor(Math.random()*2); // 2..3
+        const extraCount = 3 + Math.floor(Math.random()*2); // 3..4
         for (let i=0;i<extraCount;i++){
           const pw = Math.round(randRange(150, 240));
-          const px = Math.round(randRange(60, w - pw - 60));
-          const py = Math.round(top1 - randRange(40, 110)); // above top layer
+          const px = Math.round(randRange(40, w - pw - 40));
+          const py = Math.round(top1 - randRange(40, 140)); // higher range
           const plat = { x:px, y:py, w:pw, h:ph, active:true, shape: (i%2? 'rounded':'ice') };
           const rr = { x:px, y:py, w:pw, h:ph };
           if (!safeRect(rr)) continue;
+          // spacing: avoid stacking too close to existing platforms
+          let tooClose = false;
+          for (const e of platforms){
+            if (e.type==='ground') continue; const drx = Math.max(0, Math.max(e.x - (rr.x+rr.w), rr.x - (e.x+e.w))); const dry = Math.max(0, Math.max(e.y - (rr.y+rr.h), rr.y - (e.y+e.h)));
+            const centerGapY = Math.abs((e.y+e.h/2) - (rr.y+rr.h/2));
+            if (dry < 24 && drx < 40) { tooClose = true; break; } // near overlap
+            if (centerGapY < 50 && drx < 20) { tooClose = true; break; } // stacked vertically
+          }
+          if (tooClose) continue;
           if (rectAny(rr, platforms)) continue;
           platforms.push(plat);
           // 30% chance to make it crumble with respawn cues
@@ -1475,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (inSpawnSafe(r)) return false;
           if (rectAny(r, platforms)) return false;
           if (rectAny(r, hazards)) return false;
-          addBouncePad(r.x, r.y, r.w, r.h, 1.7, 0, -1);
+          addBouncePadSafe(r.x, r.y, r.w, r.h, 1.9, 0, -1);
           padsPlaced++; return true;
         }
         // reachable vertical step based on physics step already computed
@@ -1696,21 +1726,24 @@ document.addEventListener('DOMContentLoaded', function() {
       return false;
     }
     function findClimbTarget(p){
-      // Find a platform above within horizontal reach after a jump
-      const maxRise = (JUMP_V * JUMP_V) / (2 * G); // theoretical max rise
-      const targetY = p.y - Math.min(maxRise, 180);
-      let best = null; let bestDy = 1e9;
+      // Find a platform above within reach (jump or via nearby pad), preferring safer (no saw) landings
+      const maxRise = (JUMP_V * JUMP_V) / (2 * G);
+      let best = null; let bestScore = -1;
+      const cx = p.x + p.w/2;
       for (const s of platforms){
         if (s.type === 'ground' || s.active === false) continue;
-        if (s.y + 2 >= p.y) continue; // only above
+        if (s.y + 2 >= p.y) continue;
         const dy = (p.y - s.y);
-        if (dy > maxRise + 40) continue;
-        const sLeft = s.x - 12, sRight = s.x + s.w + 12;
-        const cx = p.x + p.w/2;
-        // Require we are roughly under the platform horizontally, or will be after short move
-        if (cx > sLeft - 80 && cx < sRight + 80) {
-          if (dy < bestDy) { bestDy = dy; best = s; }
-        }
+        if (dy > maxRise + 60) continue;
+        const sLeft = s.x - 16, sRight = s.x + s.w + 16;
+        // Horizontal alignment window
+        const within = (cx > sLeft - 120 && cx < sRight + 120);
+        if (!within) continue;
+        // Hazard penalty: saw close to landing area
+        let hazardCost = 0;
+        for (const hz of hazards){ if (hz.type==='saw'){ const dx = Math.max(0, Math.max(hz.x - (s.x + s.w), s.x - hz.x)); const dyh = Math.abs((s.y + s.h/2) - hz.y); const d = Math.hypot(dx, dyh); if (d < hz.r + 50) hazardCost += 1; } }
+        const score = 1000 - dy - hazardCost*200 + s.w*0.05;
+        if (score > bestScore){ bestScore = score; best = s; }
       }
       return best;
     }
@@ -1739,10 +1772,26 @@ document.addEventListener('DOMContentLoaded', function() {
       const dist = Math.hypot(dx, dy);
 
       // Decide movement target: enemy or a climb platform
-      const climbTarget = isEnemyBlocked(p, enemy) || (enemy.y + enemy.h*0.4 < p.y - 24) ? findClimbTarget(p) : null;
+      let climbTarget = null;
+      if (isEnemyBlocked(p, enemy) || (enemy.y + enemy.h*0.4 < p.y - 24)) {
+        climbTarget = findClimbTarget(p);
+      }
+      // If too high to reach by a single jump, prefer a nearby bouncepad aligned with target
+      let gotoPadX = null;
+      if (climbTarget){
+        const rise = (p.y - climbTarget.y);
+        const maxRise = (JUMP_V * JUMP_V) / (2 * G);
+        if (rise > maxRise * 0.9){
+          // find pad nearest to climbTarget center
+          const tx = climbTarget.x + climbTarget.w/2;
+          let best = null, bestDx = 1e9;
+          for (const hz of hazards){ if (hz.type==='bounce'){ const c = hz.x + hz.w/2; const dd = Math.abs(c - tx); if (dd < bestDx){ bestDx = dd; best = hz; } } }
+          if (best) gotoPadX = best.x + best.w/2;
+        }
+      }
       let wantDir = 0;
       if (climbTarget) {
-        const tx = climbTarget.x + climbTarget.w/2;
+        const tx = (gotoPadX != null) ? gotoPadX : (climbTarget.x + climbTarget.w/2);
         wantDir = Math.sign(tx - (p.x + p.w/2));
       } else {
         if (dist > tooFar) wantDir = Math.sign(dx);
@@ -1760,13 +1809,13 @@ document.addEventListener('DOMContentLoaded', function() {
         wantDir = -Math.sign(p.vx || dx || 1);
       }
 
-      // Apply acceleration with air control
-      const accel = MOVE_A * (p.onGround ? 1 : AIR_CTRL) * 0.9;
-      p.vx += wantDir * accel * dt;
-      p.vx = clamp(p.vx, -MAX_VX * 0.75, MAX_VX * 0.75);
+      // Apply movement desire
+      const accel = 900 * (1 + p.moveBoost);
+      p.vx += wantDir * accel * dt * 0.8;
+      p.vx = clamp(p.vx, -MAX_VX * (1 + p.moveBoost), MAX_VX * (1 + p.moveBoost));
 
       // Platform climbing and necessary jumps only
-      const needToClimb = enemy.y + enemy.h*0.4 < p.y - 24; // enemy above
+      const needToClimb = (enemy.y + enemy.h*0.4 < p.y - 24) || !!climbTarget; // enemy above or path desired
       const incomingBullet = detectIncomingBullets(p, enemy);
 
       let shouldJump = false;
@@ -1782,23 +1831,15 @@ document.addEventListener('DOMContentLoaded', function() {
         p.aiJumpCd = AI.jumpCooldown;
       }
 
-      // Aiming with bullet drop compensation
-      const gunX = p.x + p.w / 2 + p.facing * 12;
-      const gunY = p.y + p.h * 0.35;
-      const ex = enemy.x + enemy.w / 2;
-      const ey = enemy.y + enemy.h * 0.4;
-
+      const gunX = p.x + p.w/2 + p.facing*10;
+      const gunY = p.y + p.h*0.35;
+      const ex = enemy.x + enemy.w/2; const ey = enemy.y + enemy.h*0.4;
       const aim = computeAimWithDropLead(gunX, gunY, ex, ey, enemy.vx || 0, enemy.vy || 0, p.bulletSpeed, G*0.2);
       let aimX = aim.x, aimY = aim.y;
       // jitter scaled by difficulty
-      const jitterAng = randRange(-AI.aimJitter, AI.aimJitter) * 0.08; // ~±0.08 rad at aimJitter=1
-      const jittered = rotateVec(aimX, aimY, jitterAng);
-      aimX = jittered.x; aimY = jittered.y;
+      const jitter = (Math.random()-0.5) * AI.aimJitter;
+      aimX = rotateVec(aimX, aimY, jitter).x; aimY = rotateVec(aimX, aimY, jitter).y;
 
-      // Update facing
-      p.facing = Math.sign(aimX) || p.facing;
-
-      // Shooting logic
       p.reload -= dt;
       if (p.reload <= 0 && !p.reloading && p.ammoInMag > 0) {
         // only shoot if roughly in range and line-of-sight isn't badly blocked
@@ -1850,12 +1891,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Helper function to detect hazards ahead
     function detectHazardsAhead(p) {
-      const lookAhead = 50 * Math.sign(p.vx || 1);
-      const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 10, w: 30, h: 10 };
-      
+      const lookAhead = 60 * Math.sign(p.vx || 1);
+      const feetBox = { x: p.x + lookAhead, y: p.y + p.h - 12, w: 34, h: 12 };
+      function distPointRect(px, py, r){ const cx = clamp(px, r.x, r.x + r.w); const cy = clamp(py, r.y, r.y + r.h); return Math.hypot(px - cx, py - cy); }
       for (const hz of hazards) {
-        if (rectsIntersect(feetBox, hz)) {
-          return true;
+        if (hz.type==='saw'){
+          const d = distPointRect(hz.x, hz.y, feetBox);
+          if (d <= (hz.r + 12)) return true;
+        } else {
+          if (rectsIntersect(feetBox, hz)) return true;
         }
       }
       return false;
